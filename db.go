@@ -5,13 +5,15 @@ import (
 	"github.com/coopernurse/gorp"
 	_ "github.com/mattn/go-sqlite3"
 	"log"
+	"strings"
 )
 
 type Stock struct {
 	// db tag lets you specify the column name if it differs from the struct field
-	Id    int64 `db:"stock_id"`
-	Short string
-	Name  string
+	Id     int64  `db:"stock_id"`
+	Market string `db:"market"` // "fr", "us"
+	Short  string `db:"short"`
+	Name   string `db:"name"`
 }
 
 type Contact struct {
@@ -27,10 +29,12 @@ type Value struct {
 }
 
 type Alert struct {
-	Id      int64 `db:"alert_id"`
-	Contact int64 `db:"contact_id"`
-	Stock   int64 `db:"stock_id"`
-	Diff    float32
+	Id            int64   `db:"alert_id"`
+	Contact       int64   `db:"contact_id"`
+	Stock         int64   `db:"stock_id"`
+	LastTriggered int64   `db:"last_triggered"`
+	LastValue     float32 `db:"last_value"`
+	Diff          float32 `db:"diff"`
 }
 
 type FtsDB struct {
@@ -38,9 +42,9 @@ type FtsDB struct {
 	mapping    *gorp.DbMap
 }
 
-func FtsDBOpen() *FtsDB {
+func NewFtsDB(par *Parameters) *FtsDB {
 	// We connect to the database
-	conn, err := sql.Open("sqlite3", "followthestock.db")
+	conn, err := sql.Open("sqlite3", par.dbfile)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -67,7 +71,10 @@ func (db FtsDB) Close() {
 	db.connection.Close()
 }
 
-func (db FtsDB) GetContact(email string) *Contact {
+func (db *FtsDB) GetContact(email string) *Contact {
+	// We remove the part after the "/"
+	email = strings.SplitN(email, "/", 2)[0]
+
 	c := &Contact{}
 	err := db.mapping.SelectOne(c, "select * from contact where email=?", email)
 	if err != nil {
@@ -78,6 +85,41 @@ func (db FtsDB) GetContact(email string) *Contact {
 	}
 
 	return c
+}
+
+func (db *FtsDB) GetStock(market, short string) *Stock {
+	log.Printf("GetStock( \"%s\", \"%s\" );", market, short)
+	s := &Stock{}
+	err := db.mapping.SelectOne(s, "select * from stock where market=? and short=?", market, short)
+
+	if err != nil {
+		return nil
+	} else {
+		return s
+	}
+}
+
+func (db *FtsDB) GetAllStocks() *[]Stock {
+	var stocks []Stock
+	db.mapping.Select(&stocks, "select * from stock")
+	return &stocks
+}
+
+func (db *FtsDB) SaveStockValue(stock *Stock, value float32) {
+
+}
+
+func (s *Stock) Save() error {
+	if s.Id != 0 {
+		_, e := db.mapping.Update(s)
+		return e
+	} else {
+		return db.mapping.Insert(s)
+	}
+}
+
+func (s *Stock) String() string {
+	return s.Market + ":" + s.Short
 }
 
 type DbSubscribeStock struct {

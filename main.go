@@ -20,7 +20,7 @@ func handle_chat(v *xmpp.Chat) *xmpp.Chat {
 		return nil
 	}
 
-	tokens := strings.SplitN(v.Text, " ", 2)
+	tokens := strings.SplitN(v.Text, " ", 3)
 	cmd := tokens[0]
 
 	if cmd == "!ping" {
@@ -32,10 +32,20 @@ Available commands are:
 !ping <data>    - Ping test
 !list           - List currently monitored stocks
 !me             - Display data about yourself
+!stock <stock>  - Get data about a stock
 		`}
 	} else if cmd == "!me" {
 		contact := db.GetContact(v.Remote)
 		return &xmpp.Chat{Type: "chat", Remote: v.Remote, Text: fmt.Sprintf("You are contact %d (%s)", contact.Id, contact.Email)}
+	} else if cmd == "!stock" && len(tokens) >= 2 {
+		short := tokens[1]
+		stock, err := stocks.GetStock(short)
+		if err == nil {
+			value, _ := stock.GetValue()
+			return &xmpp.Chat{Type: "chat", Remote: v.Remote, Text: fmt.Sprintf("Stock \"%s\" (%s:%s:%d) : %f", stock.Name, stock.Market, stock.Short, stock.Id, value)}
+		} else {
+			return &xmpp.Chat{Type: "chat", Remote: v.Remote, Text: fmt.Sprintf("Could not find stock %s: %v", short, err)}
+		}
 	} else {
 		return &xmpp.Chat{Type: "chat", Remote: v.Remote, Text: fmt.Sprintf("What do you mean ? Type !help for help.")}
 	}
@@ -110,6 +120,7 @@ func console_handling() {
 }
 
 var db *FtsDB
+var stocks *StocksMgmt
 
 var par Parameters
 
@@ -121,8 +132,13 @@ func main() {
 	ParametersParse(&par)
 
 	// We open the database
-	db = FtsDBOpen()
+	db = NewFtsDB(&par)
 	defer db.Close()
+
+	// We load the stocks
+	stocks = NewStocksMgmt()
+	stocks.Start()
+	defer stocks.Close()
 
 	// We start the XMPP handling code
 	go xmpp_handling()
