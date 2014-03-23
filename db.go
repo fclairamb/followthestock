@@ -34,7 +34,7 @@ type Alert struct {
 	Stock         int64   `db:"stock_id"`
 	LastTriggered int64   `db:"last_triggered"`
 	LastValue     float32 `db:"last_value"`
-	Diff          float32 `db:"diff"`
+	Percent       float32 `db:"percent"`
 }
 
 type FtsDB struct {
@@ -99,6 +99,12 @@ func (db *FtsDB) GetStock(market, short string) *Stock {
 	}
 }
 
+func (db *FtsDB) GetAlerts(s *Stock) *[]Alert {
+	var alerts []Alert
+	db.mapping.Select(&alerts, "select * from alert where stock_id=?", s.Id)
+	return &alerts
+}
+
 func (db *FtsDB) GetAllStocks() *[]Stock {
 	var stocks []Stock
 	db.mapping.Select(&stocks, "select * from stock")
@@ -107,6 +113,25 @@ func (db *FtsDB) GetAllStocks() *[]Stock {
 
 func (db *FtsDB) SaveStockValue(stock *Stock, value float32) {
 
+}
+
+func (db *FtsDB) SubscribeAlert(s *Stock, c *Contact, per float32) (alert *Alert, err error) {
+	db.mapping.Exec("delete from alert where stock_id=? and contact_id=?", s.Id, c.Id)
+
+	alert = &Alert{Stock: s.Id, Contact: c.Id, Percent: per}
+
+	db.SaveAlert(alert)
+
+	return
+}
+
+func (db *FtsDB) SaveAlert(a *Alert) (err error) {
+	if a.Id != 0 {
+		_, err = db.mapping.Update(a)
+	} else {
+		err = db.mapping.Insert(a)
+	}
+	return
 }
 
 func (s *Stock) Save() error {
@@ -120,10 +145,4 @@ func (s *Stock) Save() error {
 
 func (s *Stock) String() string {
 	return s.Market + ":" + s.Short
-}
-
-type DbSubscribeStock struct {
-	contact   string
-	stock     string
-	variation float32
 }

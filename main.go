@@ -7,6 +7,7 @@ import (
 	"github.com/mattn/go-xmpp"
 	"log"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -20,7 +21,7 @@ func handle_chat(v *xmpp.Chat) *xmpp.Chat {
 		return nil
 	}
 
-	tokens := strings.SplitN(v.Text, " ", 3)
+	tokens := strings.SplitN(v.Text, " ", -1)
 	cmd := tokens[0]
 
 	if cmd == "!ping" {
@@ -28,11 +29,12 @@ func handle_chat(v *xmpp.Chat) *xmpp.Chat {
 	} else if cmd == "!help" {
 		return &xmpp.Chat{Type: "chat", Remote: v.Remote, Text: `
 Available commands are:
-!help           - This command
-!ping <data>    - Ping test
-!list           - List currently monitored stocks
-!me             - Display data about yourself
-!stock <stock>  - Get data about a stock
+!help            - This command
+!ping <data>     - Ping test
+!list            - List currently monitored stocks
+!me              - Display data about yourself
+!stock <stock>   - Get data about a stock
+!s <stock> <per> - Subscribe to variation about a stock
 		`}
 	} else if cmd == "!me" {
 		contact := db.GetContact(v.Remote)
@@ -46,6 +48,34 @@ Available commands are:
 		} else {
 			return &xmpp.Chat{Type: "chat", Remote: v.Remote, Text: fmt.Sprintf("Could not find stock %s: %v", short, err)}
 		}
+	} else if cmd == "!s" && len(tokens) >= 3 {
+		short := tokens[1]
+
+		stock, err := stocks.GetStock(short)
+
+		if err != nil {
+			return &xmpp.Chat{Type: "chat", Remote: v.Remote, Text: fmt.Sprintf("Could not find stock %s: %v", short, err)}
+		}
+
+		contact := db.GetContact(v.Remote)
+
+		if contact == nil {
+			return &xmpp.Chat{Type: "chat", Remote: v.Remote, Text: fmt.Sprintf("Could not get contact !")}
+		}
+
+		per, err := strconv.ParseFloat(tokens[2], 32)
+
+		if err != nil {
+			return &xmpp.Chat{Type: "chat", Remote: v.Remote, Text: fmt.Sprintf("Percentage parsing error", err)}
+		}
+
+		alert, err := db.SubscribeAlert(stock, contact, float32(per))
+		if err != nil {
+			return &xmpp.Chat{Type: "chat", Remote: v.Remote, Text: fmt.Sprintf("Could not save alert: %v", err)}
+		}
+
+		return &xmpp.Chat{Type: "chat", Remote: v.Remote, Text: fmt.Sprintf("Done: %v", alert)}
+
 	} else {
 		return &xmpp.Chat{Type: "chat", Remote: v.Remote, Text: fmt.Sprintf("What do you mean ? Type !help for help.")}
 	}

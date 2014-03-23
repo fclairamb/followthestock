@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"math"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -28,8 +29,29 @@ func (sf *StockFollower) run() {
 			log.Println("Stock", sf.Stock, "error", err)
 		} else {
 			log.Println("Stock", sf.Stock, "=", v)
+			sf.considerValue(v)
 		}
 		time.Sleep(time.Minute)
+	}
+}
+
+func (sf *StockFollower) considerValue(value float32) {
+	db.SaveStockValue(sf.Stock, value)
+	for _, al := range *db.GetAlerts(sf.Stock) {
+		if al.LastValue == 0 {
+			al.LastValue = value
+			db.SaveAlert(&al)
+			continue
+		}
+
+		diff := value - al.LastValue
+		per := diff / al.LastValue * 100
+		varPer := float32(math.Abs(float64(per)))
+		if varPer >= al.Percent {
+			log.Println("We have ", per, " on ", sf.Stock)
+		} else {
+			log.Println("Alert", al.Id, ":", varPer)
+		}
 	}
 }
 
@@ -51,9 +73,9 @@ type StocksMgmt struct {
 }
 
 func httpGet(url string) (*http.Response, error) {
-	log.Println("Fetching ", url, "...")
+	log.Println("Fetching", url, "...")
 	r, e := http.Get(url)
-	log.Println("Fetched ", url)
+	//log.Println("Fetched ", url)
 	return r, e
 }
 
@@ -88,33 +110,44 @@ func tryNewStock(market, short string) (*Stock, error) {
 	log.Println(fmt.Sprintf("tryNewStock( \"%s\", \"%s\" );", market, short))
 	s := &Stock{Market: market, Short: short}
 
-	body, err := fetchBoursoramaPageFomSymbol(s.GetBoursoramaSymbol())
+	body, err := fetchBoursoramaPageFomSymbol(s.getBoursoramaSymbol())
 
 	if err != nil {
 		return nil, errors.New(fmt.Sprintf("No \"%s\" on %s market !", short, market))
 	}
 
-	{ // Name
-		// http://play.golang.org/p/TpmUsGxvtQ
-		re, err := regexp.Compile("(?s)\\<h1\\>.*title=\"([^\\\"]+)\".*\\</h1\\>")
+	{ // First attempt for standard quotations
+		reName, err := regexp.Compile("(?s)<h1>.*title=\"([^\\\"]+)\".*</h1>")
 		if err != nil {
 			log.Fatal(err)
 		}
-		result := re.FindStringSubmatch(body)
-		if len(result) < 2 {
-			return nil, errors.New(fmt.Sprintf("Could not find name in the %s page !", s.GetBoursoramaSymbol()))
+		result := reName.FindStringSubmatch(body)
+		if len(result) > 1 {
+			s.Name = result[1]
 		}
-		s.Name = result[1]
+	}
+
+	if len(s.Name) == 0 { // Second attempt for other quotations
+		reName, err := regexp.Compile("(?s)<h1>.*<a.*>(.*)</a>.*</h1>")
+		if err != nil {
+			log.Fatal(err)
+		}
+		result := reName.FindStringSubmatch(body)
+		if len(result) > 1 {
+			s.Name = strings.Trim(result[1], " \n\r")
+		}
 	}
 
 	return s, nil
 }
 
-func (s *Stock) GetBoursoramaSymbol() (symbol string) {
+func (s *Stock) getBoursoramaSymbol() (symbol string) {
 	if s.Market == "US" {
 		symbol = s.Short
 	} else if s.Market == "FR" {
 		symbol = "1rP" + s.Short
+	} else if s.Market == "W" {
+		symbol = "2rP" + s.Short
 	} else {
 		log.Fatal("Unknown market: " + s.Market)
 	}
@@ -124,7 +157,7 @@ func (s *Stock) GetBoursoramaSymbol() (symbol string) {
 func (s *Stock) GetValue() (value float32, err error) {
 	var body string
 	{ // We get the page's content
-		resp, err := httpGet(fmt.Sprintf("http://www.boursorama.com/cours.phtml?symbole=%s", s.GetBoursoramaSymbol()))
+		resp, err := httpGet(fmt.Sprintf("http://www.boursorama.com/cours.phtml?symbole=%s", s.getBoursoramaSymbol()))
 		defer resp.Body.Close()
 		if err != nil {
 			return -1, err
@@ -203,9 +236,21 @@ func (sm *StocksMgmt) GetStock(short string) (s *Stock, e error) {
 		}
 	}
 
-	if s == nil {
-		e = errors.New("Could not find " + short)
-	} else {
+	if !precise && s == nil {
+		market = "W"
+		s = db.GetStock(market, short)
+
+		if s == nil {
+			s, e = tryNewStock(market, short)
+			if e == nil {
+				s.Save()
+			}
+		} else {
+			log.Printf("Stock: %v", s)
+		}
+	}
+
+	if s != nil {
 		e = nil
 	}
 
