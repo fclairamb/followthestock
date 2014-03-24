@@ -34,9 +34,9 @@ func (x *FtsXmpp) handle_chat(v *xmpp.Chat) (err error) {
 	cmd := tokens[0]
 
 	if cmd == "!ping" {
-		x.Send <- &xmpp.Chat{Type: "chat", Remote: v.Remote, Text: "!pong " + v.Text[len("!ping"):]}
+		x.Send <- &SendChat{Remote: v.Remote, Text: "!pong " + v.Text[len("!ping"):]}
 	} else if cmd == "!help" {
-		x.Send <- &xmpp.Chat{Type: "chat", Remote: v.Remote, Text: `
+		x.Send <- &SendChat{Remote: v.Remote, Text: `
 Available commands are:
 
 !help             - This command
@@ -118,21 +118,24 @@ Available commands are:
 		}
 		i := 0
 		msg := ""
-		log.Println("Contact", c)
+		//log.Println("Contact", c)
 		for _, al := range *db.GetAlertsForContact(c) {
-			log.Println(al)
+			//log.Println(al)
 			i++
 			s := db.GetStockFromId(al.Stock)
 			if s == nil {
 				db.DeleteAlert(&al)
 				continue
 			}
-			msg += fmt.Sprintf("\n%s - %f [%d]", s.String(), al.Percent, al.Id)
+			msg += fmt.Sprintf("\n%s - %f%% / %d", s.String(), al.Percent, al.Id)
 
 			if i%5 == 0 {
 				x.Send <- &SendChat{Remote: v.Remote, Text: msg}
 				msg = ""
 			}
+		}
+		if i == 0 {
+			x.Send <- &SendChat{Remote: v.Remote, Text: "You didn't subscribe to anything !"}
 		}
 		if len(msg) != 0 {
 			x.Send <- &SendChat{Remote: v.Remote, Text: msg}
