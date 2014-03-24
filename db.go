@@ -71,7 +71,7 @@ func (db FtsDB) Close() {
 	db.connection.Close()
 }
 
-func (db *FtsDB) GetContact(email string) *Contact {
+func (db *FtsDB) GetContactFromEmail(email string) *Contact {
 	// We remove the part after the "/"
 	email = strings.SplitN(email, "/", 2)[0]
 
@@ -81,9 +81,20 @@ func (db *FtsDB) GetContact(email string) *Contact {
 		log.Println("Creating contact ", email)
 		c.Email = email
 		err := db.mapping.Insert(c)
-		log.Println("Could not insert:", err)
+		if err != nil {
+			log.Println("Could not insert:", err)
+		}
 	}
 
+	return c
+}
+
+func (db *FtsDB) GetContactFromId(id int64) *Contact {
+	c := &Contact{}
+	err := db.mapping.SelectOne(c, "select * from contact where contact_id=?", id)
+	if err != nil {
+		c = nil
+	}
 	return c
 }
 
@@ -131,6 +142,11 @@ func (db *FtsDB) SaveAlert(a *Alert) (err error) {
 	} else {
 		err = db.mapping.Insert(a)
 	}
+	return
+}
+
+func (db *FtsDB) DeleteAlert(a *Alert) (err error) {
+	_, err = db.mapping.Delete(a)
 	return
 }
 

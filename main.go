@@ -37,7 +37,7 @@ Available commands are:
 !s <stock> <per> - Subscribe to variation about a stock
 		`}
 	} else if cmd == "!me" {
-		contact := db.GetContact(v.Remote)
+		contact := db.GetContactFromEmail(v.Remote)
 		return &xmpp.Chat{Type: "chat", Remote: v.Remote, Text: fmt.Sprintf("You are contact %d (%s)", contact.Id, contact.Email)}
 	} else if cmd == "!stock" && len(tokens) >= 2 {
 		short := tokens[1]
@@ -57,7 +57,7 @@ Available commands are:
 			return &xmpp.Chat{Type: "chat", Remote: v.Remote, Text: fmt.Sprintf("Could not find stock %s: %v", short, err)}
 		}
 
-		contact := db.GetContact(v.Remote)
+		contact := db.GetContactFromEmail(v.Remote)
 
 		if contact == nil {
 			return &xmpp.Chat{Type: "chat", Remote: v.Remote, Text: fmt.Sprintf("Could not get contact !")}
@@ -69,7 +69,7 @@ Available commands are:
 			return &xmpp.Chat{Type: "chat", Remote: v.Remote, Text: fmt.Sprintf("Percentage parsing error", err)}
 		}
 
-		alert, err := db.SubscribeAlert(stock, contact, float32(per))
+		alert, err := stocks.SubscribeAlert(stock, contact, float32(per))
 		if err != nil {
 			return &xmpp.Chat{Type: "chat", Remote: v.Remote, Text: fmt.Sprintf("Could not save alert: %v", err)}
 		}
@@ -79,6 +79,10 @@ Available commands are:
 	} else {
 		return &xmpp.Chat{Type: "chat", Remote: v.Remote, Text: fmt.Sprintf("What do you mean ? Type !help for help.")}
 	}
+}
+
+type SendChat struct {
+	Remote, Text string
 }
 
 func xmpp_handling() {
@@ -123,6 +127,9 @@ func xmpp_handling() {
 				}
 				//case xmpp.Presence:
 				//	fmt.Println("==> PRESENCE:", v.From, v.Show)
+
+			case SendChat:
+				talk.Send(xmpp.Chat{Type: "chat", Remote: v.Remote, Text: v.Text})
 			}
 		}
 	}

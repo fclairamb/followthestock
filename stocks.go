@@ -47,10 +47,22 @@ func (sf *StockFollower) considerValue(value float32) {
 		diff := value - al.LastValue
 		per := diff / al.LastValue * 100
 		varPer := float32(math.Abs(float64(per)))
+		log.Println("Alert", al.Id, sf.Stock, ":", varPer, "%")
 		if varPer >= al.Percent {
-			log.Println("We have ", per, " on ", sf.Stock)
-		} else {
-			log.Println("Alert", al.Id, ":", varPer)
+			log.Println("Alert", al.Id, "Trigger !")
+			contact := db.GetContactFromId(al.Contact)
+			if contact == nil {
+				log.Println("Contact missing, deleting alert !")
+				db.DeleteAlert(&al)
+				continue
+			}
+			al.LastValue = value
+			timeDiff := time.Now().UTC().UnixNano() - al.LastTriggered
+			al.LastTriggered = time.Now().UTC().UnixNano()
+			message := fmt.Sprintf("%s : %f (%d)", sf.Stock.String(), varPer, timeDiff/time.Minute.Nanoseconds())
+			db.SaveAlert(&al)
+			sc := &SendChat{Remote: contact.Email, Text: message}
+			log.Println("Sending ", sc)
 		}
 	}
 }
@@ -69,7 +81,7 @@ func (sf *StockFollower) String() string {
 
 type StocksMgmt struct {
 	sync.RWMutex
-	stocks map[string]StockFollower
+	stocks map[string]*StockFollower
 }
 
 func httpGet(url string) (*http.Response, error) {
@@ -187,9 +199,11 @@ func (s *Stock) GetValue() (value float32, err error) {
 			log.Fatal(err)
 		}
 		result := re.FindStringSubmatch(body)
-		{
+		if len(result) >= 2 {
 			v, _ := strconv.ParseFloat(strings.Replace(result[1], " ", "", -1), 32)
 			value = float32(v)
+		} else {
+			log.Println("Could not fetch cotation for", s.String())
 		}
 	}
 
@@ -197,7 +211,7 @@ func (s *Stock) GetValue() (value float32, err error) {
 }
 
 func NewStocksMgmt() *StocksMgmt {
-	sm := &StocksMgmt{stocks: make(map[string]StockFollower)}
+	sm := &StocksMgmt{stocks: make(map[string]*StockFollower)}
 
 	return sm
 }
@@ -257,21 +271,38 @@ func (sm *StocksMgmt) GetStock(short string) (s *Stock, e error) {
 	return
 }
 
+func (sm *StocksMgmt) LoadStock(s *Stock) {
+	sf := NewStockFollower(s)
+	sf.Start()
+	sm.stocks[s.String()] = sf
+}
+
 func (sm *StocksMgmt) LoadStocks() (err error) {
 	stocks := db.GetAllStocks()
 
 	for _, s := range *stocks {
 		log.Println("Loading", s.String(), "...")
 		stock := s // Not doing so make us share the same pointer
-		sf := NewStockFollower(&stock)
-		sf.Start()
+		sm.LoadStock(&stock)
 	}
 
 	return nil
 }
 
+func (sm *StocksMgmt) SubscribeAlert(s *Stock, c *Contact, per float32) (alert *Alert, err error) {
+	a, e := db.SubscribeAlert(s, c, per)
+
+	if _, ok := sm.stocks[s.String()]; !ok {
+		sm.LoadStock(s)
+	}
+
+	return a, e
+}
+
 func (sm *StocksMgmt) Start() {
+	sm.Lock()
 	sm.LoadStocks()
+	sm.Unlock()
 }
 
 func (sm *StocksMgmt) Close() {
