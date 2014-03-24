@@ -127,7 +127,7 @@ Available commands are:
 				db.DeleteAlert(&al)
 				continue
 			}
-			msg += fmt.Sprintf("\n%s - %f%% / %d", s.String(), al.Percent, al.Id)
+			msg += fmt.Sprintf("\n%s - %s - %f%% / %d", s.String(), s.Name, al.Percent, al.Id)
 
 			if i%5 == 0 {
 				x.Send <- &SendChat{Remote: v.Remote, Text: msg}
