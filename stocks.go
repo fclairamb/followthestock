@@ -18,6 +18,26 @@ type StockFollower struct {
 	Stock *Stock
 }
 
+var (
+	reName1, reName2, reCotation *regexp.Regexp
+)
+
+func init() {
+	var err error
+	reName1, err = regexp.Compile("(?s)<h1>.*title=\"([^\\\"]+)\".*</h1>")
+	if err != nil {
+		log.Fatal(err)
+	}
+	reName2, err = regexp.Compile("(?s)<h1>.*<a.*>(.*)</a>.*</h1>")
+	if err != nil {
+		log.Fatal(err)
+	}
+	reCotation, err = regexp.Compile("<span class=\"cotation\">([0-9\\ \\.]+)[^<>]*[A-Z]{2,3}</span>")
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
 func NewStockFollower(s *Stock) *StockFollower {
 	return &StockFollower{Stock: s}
 }
@@ -37,7 +57,7 @@ func (sf *StockFollower) run() {
 
 func (sf *StockFollower) considerValue(value float32) {
 	db.SaveStockValue(sf.Stock, value)
-	for _, al := range *db.GetAlerts(sf.Stock) {
+	for _, al := range *db.GetAlertsForStock(sf.Stock) {
 		if al.LastValue == 0 {
 			al.LastValue = value
 			db.SaveAlert(&al)
@@ -47,22 +67,27 @@ func (sf *StockFollower) considerValue(value float32) {
 		diff := value - al.LastValue
 		per := diff / al.LastValue * 100
 		varPer := float32(math.Abs(float64(per)))
-		log.Println("Alert", al.Id, sf.Stock, ":", varPer, "%")
+		log.Println("Alert", al.Id, "-", sf.Stock, ":", varPer, "%")
 		if varPer >= al.Percent {
-			log.Println("Alert", al.Id, "Trigger !")
+			log.Println("Alert", al.Id, "- Trigger !")
 			contact := db.GetContactFromId(al.Contact)
 			if contact == nil {
-				log.Println("Contact missing, deleting alert !")
+				log.Println("Alert", al.Id, "- Contact missing, deleting alert !")
 				db.DeleteAlert(&al)
 				continue
 			}
 			al.LastValue = value
 			timeDiff := time.Now().UTC().UnixNano() - al.LastTriggered
 			al.LastTriggered = time.Now().UTC().UnixNano()
-			message := fmt.Sprintf("%s : %f (%d)", sf.Stock.String(), varPer, timeDiff/time.Minute.Nanoseconds())
+			var plus string
+			if per > 0 {
+				plus = "+"
+			} else {
+				plus = ""
+			}
+			message := fmt.Sprintf("%s : %f (%s%f%%) in %d minutes [%d]", sf.Stock.String(), value, plus, per, timeDiff/time.Minute.Nanoseconds(), al.Id)
 			db.SaveAlert(&al)
-			sc := &SendChat{Remote: contact.Email, Text: message}
-			log.Println("Sending ", sc)
+			xm.Send <- &SendChat{Remote: contact.Email, Text: message}
 		}
 	}
 }
@@ -129,25 +154,21 @@ func tryNewStock(market, short string) (*Stock, error) {
 	}
 
 	{ // First attempt for standard quotations
-		reName, err := regexp.Compile("(?s)<h1>.*title=\"([^\\\"]+)\".*</h1>")
-		if err != nil {
-			log.Fatal(err)
-		}
-		result := reName.FindStringSubmatch(body)
+		result := reName1.FindStringSubmatch(body)
 		if len(result) > 1 {
 			s.Name = result[1]
 		}
 	}
 
 	if len(s.Name) == 0 { // Second attempt for other quotations
-		reName, err := regexp.Compile("(?s)<h1>.*<a.*>(.*)</a>.*</h1>")
-		if err != nil {
-			log.Fatal(err)
-		}
-		result := reName.FindStringSubmatch(body)
+		result := reName2.FindStringSubmatch(body)
 		if len(result) > 1 {
 			s.Name = strings.Trim(result[1], " \n\r")
 		}
+	}
+
+	if len(s.Name) == 0 {
+		return s, errors.New("Could not get the name")
 	}
 
 	return s, nil
@@ -170,10 +191,10 @@ func (s *Stock) GetValue() (value float32, err error) {
 	var body string
 	{ // We get the page's content
 		resp, err := httpGet(fmt.Sprintf("http://www.boursorama.com/cours.phtml?symbole=%s", s.getBoursoramaSymbol()))
-		defer resp.Body.Close()
 		if err != nil {
 			return -1, err
 		}
+		defer resp.Body.Close()
 		if resp.StatusCode != 200 {
 			return -1, errors.New(fmt.Sprintf("Wrong status code %d", resp.StatusCode))
 		}
@@ -194,11 +215,7 @@ func (s *Stock) GetValue() (value float32, err error) {
 	}
 
 	{ // Value
-		re, err := regexp.Compile("<span class=\"cotation\">([0-9\\ \\.]+)[^\\<\\>]*(EUR|USD)</span>")
-		if err != nil {
-			log.Fatal(err)
-		}
-		result := re.FindStringSubmatch(body)
+		result := reCotation.FindStringSubmatch(body)
 		if len(result) >= 2 {
 			v, _ := strconv.ParseFloat(strings.Replace(result[1], " ", "", -1), 32)
 			value = float32(v)
@@ -292,11 +309,19 @@ func (sm *StocksMgmt) LoadStocks() (err error) {
 func (sm *StocksMgmt) SubscribeAlert(s *Stock, c *Contact, per float32) (alert *Alert, err error) {
 	a, e := db.SubscribeAlert(s, c, per)
 
+	sm.Lock()
 	if _, ok := sm.stocks[s.String()]; !ok {
 		sm.LoadStock(s)
 	}
+	sm.Unlock()
 
 	return a, e
+}
+
+func (sm *StocksMgmt) UnsubscribeAlert(s *Stock, c *Contact) (err error) {
+	_, err = db.UnsubscribeAlert(s, c)
+
+	return
 }
 
 func (sm *StocksMgmt) Start() {
@@ -305,6 +330,6 @@ func (sm *StocksMgmt) Start() {
 	sm.Unlock()
 }
 
-func (sm *StocksMgmt) Close() {
+func (sm *StocksMgmt) Stop() {
 
 }

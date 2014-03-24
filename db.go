@@ -98,6 +98,11 @@ func (db *FtsDB) GetContactFromId(id int64) *Contact {
 	return c
 }
 
+func (db *FtsDB) DeleteContact(c *Contact) (err error) {
+	_, err = db.mapping.Delete(c)
+	return
+}
+
 func (db *FtsDB) GetStock(market, short string) *Stock {
 	log.Printf("GetStock( \"%s\", \"%s\" );", market, short)
 	s := &Stock{}
@@ -110,7 +115,17 @@ func (db *FtsDB) GetStock(market, short string) *Stock {
 	}
 }
 
-func (db *FtsDB) GetAlerts(s *Stock) *[]Alert {
+func (db *FtsDB) GetStockFromId(id int64) *Stock {
+	s := &Stock{}
+	err := db.mapping.SelectOne(s, "select * from stock where stock_id=?", id)
+	if err != nil {
+		return nil
+	} else {
+		return s
+	}
+}
+
+func (db *FtsDB) GetAlertsForStock(s *Stock) *[]Alert {
 	var alerts []Alert
 	db.mapping.Select(&alerts, "select * from alert where stock_id=?", s.Id)
 	return &alerts
@@ -127,12 +142,21 @@ func (db *FtsDB) SaveStockValue(stock *Stock, value float32) {
 }
 
 func (db *FtsDB) SubscribeAlert(s *Stock, c *Contact, per float32) (alert *Alert, err error) {
-	db.mapping.Exec("delete from alert where stock_id=? and contact_id=?", s.Id, c.Id)
+	_, err = db.UnsubscribeAlert(s, c)
+
+	if err != nil {
+		return nil, err
+	}
 
 	alert = &Alert{Stock: s.Id, Contact: c.Id, Percent: per}
 
-	db.SaveAlert(alert)
+	err = db.SaveAlert(alert)
 
+	return
+}
+
+func (db *FtsDB) UnsubscribeAlert(s *Stock, c *Contact) (ok bool, err error) {
+	_, err = db.mapping.Exec("delete from alert where stock_id=? and contact_id=?", s.Id, c.Id)
 	return
 }
 
@@ -143,6 +167,12 @@ func (db *FtsDB) SaveAlert(a *Alert) (err error) {
 		err = db.mapping.Insert(a)
 	}
 	return
+}
+
+func (db *FtsDB) GetAlertsForContact(c *Contact) *[]Alert {
+	var alerts []Alert
+	db.mapping.Select(&alerts, "select * from alert where contact_id=?", c.Id)
+	return &alerts
 }
 
 func (db *FtsDB) DeleteAlert(a *Alert) (err error) {
