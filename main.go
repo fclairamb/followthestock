@@ -10,8 +10,16 @@ import (
 	"strings"
 )
 
-func init() {
+var xm *FtsXmpp
+var db *FtsDB
+var stocks *StocksMgmt
 
+var par Parameters
+
+var waitForRc chan int
+
+func init() {
+	waitForRc = make(chan int)
 }
 
 func console_handling() {
@@ -20,6 +28,7 @@ func console_handling() {
 		fmt.Printf("> ")
 		line, err := in.ReadString('\n')
 		if err != nil {
+			log.Fatal(err)
 			continue
 		}
 		line = strings.TrimRight(line, "\n")
@@ -28,26 +37,14 @@ func console_handling() {
 		if tokens[0] == "" {
 			continue
 		} else if tokens[0] == "quit" {
-			break
+			waitForRc <- 0
 		} else {
 			fmt.Printf("\"%s\" not understood !", tokens[0])
 		}
 	}
 }
 
-var xm *FtsXmpp
-var db *FtsDB
-var stocks *StocksMgmt
-
-var par Parameters
-
-func main() {
-
-	log.Println("Starting !")
-
-	// We parse the parameters
-	ParametersParse(&par)
-
+func core() int {
 	// We open the database
 	db = NewFtsDB(&par)
 	defer db.Close()
@@ -63,7 +60,25 @@ func main() {
 	defer xm.Stop()
 
 	// We block on the console handling code
-	console_handling()
+	go console_handling()
+
+	rc := <-waitForRc
 
 	log.Println("Stopping !")
+
+	return rc
+}
+
+func main() {
+
+	log.Println("Starting !")
+
+	// We parse the parameters
+	ParametersParse(&par)
+
+	rc := core()
+
+	log.Println("Bye !")
+
+	os.Exit(rc)
 }

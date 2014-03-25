@@ -14,6 +14,7 @@ type Parameters struct {
 	notls    bool
 	debug    bool
 	test     bool
+	exact    bool
 }
 
 func ParametersParse(par *Parameters) {
@@ -24,6 +25,7 @@ func ParametersParse(par *Parameters) {
 	flag.BoolVar(&par.notls, "notls", false, "Disable TLS")
 	flag.BoolVar(&par.debug, "debug", false, "Enable debugging")
 	flag.BoolVar(&par.test, "test", false, "Test")
+	flag.BoolVar(&par.exact, "exact", false, "Exact timing")
 
 	flag.Usage = func() {
 		fmt.Fprintln(os.Stderr, "usage: followthestock -username toto@gmail.com -password pass")

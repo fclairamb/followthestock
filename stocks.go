@@ -59,9 +59,19 @@ func (sf *StockFollower) considerValue(value float32) {
 	db.SaveStockValue(sf.Stock, value)
 	for _, al := range *db.GetAlertsForStock(sf.Stock) {
 		if al.LastValue == 0 {
+			value = value * 0.5
 			al.LastValue = value
+			message := fmt.Sprintf("%s : %f (first value to 50%% for testing) [%d]", sf.Stock.String(), value, al.Id)
 			db.SaveAlert(&al)
-			continue
+
+			contact := db.GetContactFromId(al.Contact)
+			if contact == nil {
+				log.Println("Alert", al.Id, "- Contact missing, deleting alert !")
+				db.DeleteAlert(&al)
+				continue
+			}
+
+			xm.Send <- &SendChat{Remote: contact.Email, Text: message}
 		}
 
 		diff := value - al.LastValue
@@ -77,7 +87,7 @@ func (sf *StockFollower) considerValue(value float32) {
 				continue
 			}
 			al.LastValue = value
-			timeDiff := time.Now().UTC().UnixNano() - al.LastTriggered
+			timeDiff := time.Duration(time.Now().UTC().UnixNano() - al.LastTriggered)
 			al.LastTriggered = time.Now().UTC().UnixNano()
 			var plus string
 			if per > 0 {
@@ -85,7 +95,7 @@ func (sf *StockFollower) considerValue(value float32) {
 			} else {
 				plus = ""
 			}
-			message := fmt.Sprintf("%s : %f (%s%f%%) in %d minutes [%d]", sf.Stock.String(), value, plus, per, timeDiff/time.Minute.Nanoseconds(), al.Id)
+			message := fmt.Sprintf("%s : %f (%s%f%%) in %v [%d]", sf.Stock.String(), value, plus, per, timeDiff, al.Id)
 			db.SaveAlert(&al)
 			xm.Send <- &SendChat{Remote: contact.Email, Text: message}
 		}
@@ -331,5 +341,5 @@ func (sm *StocksMgmt) Start() {
 }
 
 func (sm *StocksMgmt) Stop() {
-
+	log.Println("StocksMgmt.Stop()")
 }

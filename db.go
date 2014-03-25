@@ -17,9 +17,9 @@ type Stock struct {
 }
 
 type Contact struct {
-	Id             int64  `db:"contact_id"`
-	Email          string `db:"email"`
-	NbMessagesSent int32
+	Id         int64  `db:"contact_id"`
+	Email      string `db:"email"`
+	PauseUntil int64  `db:"pause_until"`
 }
 
 type Value struct {
@@ -190,5 +190,5 @@ func (s *Stock) Save() error {
 }
 
 func (s *Stock) String() string {
-	return s.Market + ":" + s.Short
+	return "\"" + s.Name + "\" (" + s.Market + ":" + s.Short + ")"
 }

@@ -11,10 +11,11 @@ import (
 )
 
 type FtsXmpp struct {
-	par  *Parameters
-	clt  *xmpp.Client
-	Recv chan interface{}
-	Send chan interface{}
+	par       *Parameters
+	clt       *xmpp.Client
+	Recv      chan interface{}
+	Send      chan interface{}
+	StartTime time.Time
 }
 
 type SendChat struct {
@@ -22,13 +23,25 @@ type SendChat struct {
 }
 
 func NewFtsXmpp(par *Parameters) *FtsXmpp {
-	return &FtsXmpp{par: par, Recv: make(chan interface{}, 10), Send: make(chan interface{}, 10)}
+	return &FtsXmpp{
+		par:       par,
+		Recv:      make(chan interface{}, 10),
+		Send:      make(chan interface{}, 10),
+		StartTime: time.Now().UTC(),
+	}
 }
 
 func (x *FtsXmpp) handle_chat(v *xmpp.Chat) (err error) {
 	if v.Text == "" {
 		return nil
 	}
+
+	/* No XOR
+	if strings.HasPrefix(v.Text, "test ") ^ x.par.test {
+		log.Println("Wrong mode (test or no test)")
+		return
+	}
+	*/
 
 	tokens := strings.SplitN(v.Text, " ", -1)
 	cmd := tokens[0]
@@ -42,20 +55,20 @@ Available commands are:
 !help             - This command
 !s <stock> <per>  - Subscribe to variation about a stock
 !u <stock>        - Unsubscribe from a stock
-!list             - List currently monitored stocks
+!g <stock>        - Get data about a stock
+!ls               - List currently monitored stocks
 !ping <data>      - Ping test
 !me               - Display data about yourself
-!stock <stock>    - Get data about a stock
 `}
 	} else if cmd == "!me" {
 		contact := db.GetContactFromEmail(v.Remote)
 		x.Send <- &SendChat{Remote: v.Remote, Text: fmt.Sprintf("You are contact %d (%s)", contact.Id, contact.Email)}
-	} else if cmd == "!stock" && len(tokens) >= 2 {
+	} else if cmd == "!g" && len(tokens) >= 2 {
 		short := tokens[1]
 		stock, err := stocks.GetStock(short)
 		if err == nil {
 			value, _ := stock.GetValue()
-			x.Send <- &SendChat{Remote: v.Remote, Text: fmt.Sprintf("Stock \"%s\" (%s:%s:%d) : %f", stock.Name, stock.Market, stock.Short, stock.Id, value)}
+			x.Send <- &SendChat{Remote: v.Remote, Text: fmt.Sprintf("Stock %s : %f", stock, value)}
 		} else {
 			x.Send <- &SendChat{Remote: v.Remote, Text: fmt.Sprintf("Could not find stock %s: %v", short, err)}
 		}
@@ -85,7 +98,7 @@ Available commands are:
 			return err
 		}
 
-		x.Send <- &SendChat{Remote: v.Remote, Text: fmt.Sprintf("Done: %v", alert)}
+		x.Send <- &SendChat{Remote: v.Remote, Text: fmt.Sprintf("Subscribed to \"%s\" (%v) with %f%% variation on alert %d.", stock.Name, stock.String(), per, alert.Id)}
 
 	} else if cmd == "!u" && len(tokens) == 2 {
 		short := tokens[1]
@@ -110,7 +123,7 @@ Available commands are:
 
 		x.Send <- &SendChat{Remote: v.Remote, Text: fmt.Sprintf("Done !")}
 
-	} else if cmd == "!list" {
+	} else if cmd == "!ls" {
 		c := db.GetContactFromEmail(v.Remote)
 
 		if c == nil {
@@ -127,7 +140,7 @@ Available commands are:
 				db.DeleteAlert(&al)
 				continue
 			}
-			msg += fmt.Sprintf("\n%s - %s - %f%% / %d", s.String(), s.Name, al.Percent, al.Id)
+			msg += fmt.Sprintf("\n%s - %f%% [%d]", s.String(), al.Percent, al.Id)
 
 			if i%5 == 0 {
 				x.Send <- &SendChat{Remote: v.Remote, Text: msg}
@@ -148,7 +161,12 @@ Available commands are:
 			return errors.New("Could not get contact !")
 		}
 
+		x.Send <- &SendChat{Remote: v.Remote, Text: "Who are you ?"}
+
 		db.DeleteContact(contact)
+	} else if cmd == "!uptime" {
+		diff := time.Now().UTC().Sub(x.StartTime)
+		x.Send <- &SendChat{Remote: v.Remote, Text: fmt.Sprintln("Uptime:", diff)}
 	} else {
 		x.Send <- &SendChat{Remote: v.Remote, Text: fmt.Sprintf("What do you mean ? Type !help for help.")}
 	}
