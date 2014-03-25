@@ -44,13 +44,13 @@ func console_handling() {
 	}
 }
 
-func core() int {
+func core() (rc int) {
 	// We open the database
 	db = NewFtsDB(&par)
 	defer db.Close()
 
 	// We load the stocks
-	stocks = NewStocksMgmt()
+	stocks = NewStocksMgmt(&par)
 	stocks.Start()
 	defer stocks.Stop()
 
@@ -62,11 +62,12 @@ func core() int {
 	// We block on the console handling code
 	go console_handling()
 
-	rc := <-waitForRc
+	// We wait for someone to trigger the result code
+	rc = <-waitForRc
 
 	log.Println("Stopping !")
 
-	return rc
+	return
 }
 
 func main() {

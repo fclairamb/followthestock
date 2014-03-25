@@ -116,6 +116,7 @@ func (sf *StockFollower) String() string {
 
 type StocksMgmt struct {
 	sync.RWMutex
+	par    *Parameters
 	stocks map[string]*StockFollower
 }
 
@@ -177,7 +178,7 @@ func tryNewStock(market, short string) (*Stock, error) {
 		}
 	}
 
-	if len(s.Name) == 0 {
+	if len(s.Name) == 0 { // If we still couldn't get a name
 		return s, errors.New("Could not get the name")
 	}
 
@@ -237,8 +238,8 @@ func (s *Stock) GetValue() (value float32, err error) {
 	return value, nil
 }
 
-func NewStocksMgmt() *StocksMgmt {
-	sm := &StocksMgmt{stocks: make(map[string]*StockFollower)}
+func NewStocksMgmt(par *Parameters) *StocksMgmt {
+	sm := &StocksMgmt{stocks: make(map[string]*StockFollower), par: par}
 
 	return sm
 }

@@ -57,13 +57,18 @@ Available commands are:
 !u <stock>        - Unsubscribe from a stock
 !g <stock>        - Get data about a stock
 !ls               - List currently monitored stocks
+!pause <days>     - Pause alerts for X days
+!resume           - Resume alerts
 !ping <data>      - Ping test
 !me               - Display data about yourself
 `}
 	} else if cmd == "!me" {
 		contact := db.GetContactFromEmail(v.Remote)
 		x.Send <- &SendChat{Remote: v.Remote, Text: fmt.Sprintf("You are contact %d (%s)", contact.Id, contact.Email)}
-	} else if cmd == "!g" && len(tokens) >= 2 {
+	} else if cmd == "!g" {
+		if len(tokens) != 2 {
+			return errors.New("No stock provided !")
+		}
 		short := tokens[1]
 		stock, err := stocks.GetStock(short)
 		if err == nil {
@@ -72,7 +77,10 @@ Available commands are:
 		} else {
 			x.Send <- &SendChat{Remote: v.Remote, Text: fmt.Sprintf("Could not find stock %s: %v", short, err)}
 		}
-	} else if cmd == "!s" && len(tokens) == 3 {
+	} else if cmd == "!s" {
+		if len(tokens) != 3 {
+			return errors.New("You must precise stock and percentage !")
+		}
 		short := tokens[1]
 
 		stock, err := stocks.GetStock(short)
@@ -100,7 +108,11 @@ Available commands are:
 
 		x.Send <- &SendChat{Remote: v.Remote, Text: fmt.Sprintf("Subscribed to \"%s\" (%v) with %f%% variation on alert %d.", stock.Name, stock.String(), per, alert.Id)}
 
-	} else if cmd == "!u" && len(tokens) == 2 {
+	} else if cmd == "!u" {
+		if len(tokens) != 2 {
+			return errors.New("No stock provided !")
+		}
+
 		short := tokens[1]
 
 		stock, err := stocks.GetStock(short)
@@ -154,6 +166,8 @@ Available commands are:
 			x.Send <- &SendChat{Remote: v.Remote, Text: msg}
 			msg = ""
 		}
+	} else if cmd == "!pause" {
+
 	} else if cmd == "!forgetme" {
 		contact := db.GetContactFromEmail(v.Remote)
 
@@ -185,7 +199,7 @@ func (x *FtsXmpp) runRecv() {
 			}
 			err := x.handle_chat(&v)
 			if err != nil {
-				x.Send <- &SendChat{Remote: v.Remote, Text: fmt.Sprintln("Processing your message created an error:", err)}
+				x.Send <- &SendChat{Remote: v.Remote, Text: fmt.Sprintln("Error:", err)}
 			}
 		}
 	}
