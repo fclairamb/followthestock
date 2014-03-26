@@ -59,6 +59,7 @@ Available commands are:
 !ls               - List currently monitored stocks
 !pause <days>     - Pause alerts for X days
 !resume           - Resume alerts
+!uptime           - Server uptime
 !ping <data>      - Ping test
 !me               - Display data about yourself
 `}
@@ -180,7 +181,11 @@ Available commands are:
 		db.DeleteContact(contact)
 	} else if cmd == "!uptime" {
 		diff := time.Now().UTC().Sub(x.StartTime)
-		x.Send <- &SendChat{Remote: v.Remote, Text: fmt.Sprintln("Uptime:", diff)}
+		x.Send <- &SendChat{Remote: v.Remote, Text: fmt.Sprintf("Uptime: %s", diff)}
+	} else if cmd == "!quit" {
+		x.Send <- &SendChat{Remote: v.Remote, Text: "Bye bye!"}
+		time.Sleep(time.Second * 5)
+		waitForRc <- 1
 	} else {
 		x.Send <- &SendChat{Remote: v.Remote, Text: fmt.Sprintf("What do you mean ? Type !help for help.")}
 	}

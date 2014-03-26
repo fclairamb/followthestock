@@ -61,7 +61,7 @@ func (sf *StockFollower) considerValue(value float32) {
 		if al.LastValue == 0 {
 			value = value * 0.5
 			al.LastValue = value
-			message := fmt.Sprintf("%s : %f (first value to 50%% for testing) [%d]", sf.Stock.String(), value, al.Id)
+			al.LastTriggered = time.Now().UTC().UnixNano()
 			db.SaveAlert(&al)
 
 			contact := db.GetContactFromId(al.Contact)
@@ -71,6 +71,7 @@ func (sf *StockFollower) considerValue(value float32) {
 				continue
 			}
 
+			message := fmt.Sprintf("%s : %f (first value to 50%% for testing) [%d]", sf.Stock.String(), value, al.Id)
 			xm.Send <- &SendChat{Remote: contact.Email, Text: message}
 		}
 
