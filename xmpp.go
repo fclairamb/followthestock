@@ -187,6 +187,9 @@ Available commands are:
 		time.Sleep(time.Second * 5)
 		waitForRc <- 1
 	} else {
+		if cmd == "What" {
+			return nil
+		}
 		x.Send <- &SendChat{Remote: v.Remote, Text: fmt.Sprintf("What do you mean ? Type !help for help.")}
 	}
 
