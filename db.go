@@ -24,9 +24,10 @@ type Contact struct {
 }
 
 type Value struct {
-	Id    int64 `db:"value_id"`
-	Stock int64 `db:"stock_id"`
-	Value float32
+	Id    int64   `db:"value_id"`
+	Stock int64   `db:"stock_id"`
+	Date  int64   `db:"date"`
+	Value float32 `db:"value"`
 }
 
 type Alert struct {
@@ -190,7 +191,7 @@ func (db *FtsDB) DeleteAlert(a *Alert) (err error) {
 	return
 }
 
-func (s *Stock) Save() error {
+func (df *FtsDB) SaveStock(s *Stock) error {
 	if s.Id != 0 {
 		_, e := db.mapping.Update(s)
 		return e

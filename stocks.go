@@ -266,7 +266,7 @@ func (sm *StocksMgmt) GetStock(short string) (s *Stock, e error) {
 	if s == nil {
 		s, e = tryNewStock(market, short)
 		if e == nil {
-			s.Save()
+			db.SaveStock(s)
 		}
 	}
 
@@ -277,7 +277,7 @@ func (sm *StocksMgmt) GetStock(short string) (s *Stock, e error) {
 		if s == nil {
 			s, e = tryNewStock(market, short)
 			if e == nil {
-				s.Save()
+				db.SaveStock(s)
 			}
 		} else {
 			log.Printf("Stock: %v", s)
@@ -291,7 +291,7 @@ func (sm *StocksMgmt) GetStock(short string) (s *Stock, e error) {
 		if s == nil {
 			s, e = tryNewStock(market, short)
 			if e == nil {
-				s.Save()
+				db.SaveStock(s)
 			}
 		} else {
 			log.Printf("Stock: %v", s)
