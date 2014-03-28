@@ -80,13 +80,18 @@ func (sf *StockFollower) considerValue(value float32) {
 		varPer := float32(math.Abs(float64(per)))
 		log.Println("Alert", al.Id, "-", sf.Stock, ":", varPer, "%")
 		if varPer >= al.Percent {
-			log.Println("Alert", al.Id, "- Trigger !")
 			contact := db.GetContactFromId(al.Contact)
 			if contact == nil {
 				log.Println("Alert", al.Id, "- Contact missing, deleting alert !")
 				db.DeleteAlert(&al)
 				continue
 			}
+			if time.Now().UTC().UnixNano() < contact.PauseUntil {
+				log.Println("Alert", al.Id, "- Contact is in pause")
+				continue
+			}
+
+			log.Println("Alert", al.Id, "- Trigger !")
 			al.LastValue = value
 			timeDiff := time.Duration(time.Now().UTC().UnixNano() - al.LastTriggered)
 			al.LastTriggered = time.Now().UTC().UnixNano()

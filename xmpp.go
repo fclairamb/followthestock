@@ -168,7 +168,38 @@ Available commands are:
 			msg = ""
 		}
 	} else if cmd == "!pause" {
+		if len(tokens) != 2 {
+			return errors.New("You have to specify a number of days !")
+		}
+		contact := db.GetContactFromEmail(v.Remote)
 
+		if contact == nil {
+			return errors.New("Could not get contact !")
+		}
+
+		var nb int64
+		nb, err = strconv.ParseInt(tokens[1], 10, 64)
+
+		if err != nil {
+			return err
+		}
+
+		contact.PauseUntil = time.Now().UTC().UnixNano() + time.Hour.Nanoseconds()*24*nb
+
+		db.SaveContact(contact)
+
+		x.Send <- &SendChat{Remote: v.Remote, Text: fmt.Sprintf("OK, no alert for %d days.", nb)}
+	} else if cmd == "!resume" {
+		contact := db.GetContactFromEmail(v.Remote)
+
+		if contact == nil {
+			return errors.New("Could not get contact !")
+		}
+
+		contact.PauseUntil = 0
+
+		db.SaveContact(contact)
+		x.Send <- &SendChat{Remote: v.Remote, Text: "OK, back to work!"}
 	} else if cmd == "!forgetme" {
 		contact := db.GetContactFromEmail(v.Remote)
 
@@ -188,6 +219,7 @@ Available commands are:
 		waitForRc <- 1
 	} else {
 		if cmd == "What" {
+			log.Println("Potential loophole")
 			return nil
 		}
 		x.Send <- &SendChat{Remote: v.Remote, Text: fmt.Sprintf("What do you mean ? Type !help for help.")}

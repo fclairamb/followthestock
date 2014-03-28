@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"errors"
 	"github.com/coopernurse/gorp"
 	_ "github.com/mattn/go-sqlite3"
 	"log"
@@ -157,6 +158,15 @@ func (db *FtsDB) SubscribeAlert(s *Stock, c *Contact, per float32) (alert *Alert
 
 func (db *FtsDB) UnsubscribeAlert(s *Stock, c *Contact) (ok bool, err error) {
 	_, err = db.mapping.Exec("delete from alert where stock_id=? and contact_id=?", s.Id, c.Id)
+	return
+}
+
+func (db *FtsDB) SaveContact(c *Contact) (err error) {
+	if c.Id != 0 {
+		_, err = db.mapping.Update(c)
+	} else {
+		err = errors.New("Contact doesn't exist !")
+	}
 	return
 }
 
