@@ -20,6 +20,7 @@ type StockFollower struct {
 
 var (
 	reName1, reName2, reCotation *regexp.Regexp
+	sleepTime                    time.Duration
 )
 
 func init() {
@@ -36,6 +37,8 @@ func init() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	sleepTime = time.Minute
 }
 
 func NewStockFollower(s *Stock) *StockFollower {
@@ -43,6 +46,7 @@ func NewStockFollower(s *Stock) *StockFollower {
 }
 
 func (sf *StockFollower) run() {
+	t := time.Now().UTC() //.UnixNano()
 	for {
 		v, err := sf.Stock.GetValue()
 		if err != nil {
@@ -51,7 +55,13 @@ func (sf *StockFollower) run() {
 			log.Println("Stock", sf.Stock, "=", v)
 			sf.considerValue(v)
 		}
-		time.Sleep(time.Minute)
+		if par.exact {
+			t = t.Add(sleepTime) //.Nanoseconds()
+			sl := t.Sub(time.Now().UTC())
+			time.Sleep(sl)
+		} else {
+			time.Sleep(sleepTime)
+		}
 	}
 }
 
@@ -122,7 +132,6 @@ func (sf *StockFollower) String() string {
 
 type StocksMgmt struct {
 	sync.RWMutex
-	par    *Parameters
 	stocks map[string]*StockFollower
 }
 
@@ -244,8 +253,8 @@ func (s *Stock) GetValue() (value float32, err error) {
 	return value, nil
 }
 
-func NewStocksMgmt(par *Parameters) *StocksMgmt {
-	sm := &StocksMgmt{stocks: make(map[string]*StockFollower), par: par}
+func NewStocksMgmt() *StocksMgmt {
+	sm := &StocksMgmt{stocks: make(map[string]*StockFollower)}
 
 	return sm
 }

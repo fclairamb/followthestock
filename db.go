@@ -44,7 +44,7 @@ type FtsDB struct {
 	mapping    *gorp.DbMap
 }
 
-func NewFtsDB(par *Parameters) *FtsDB {
+func NewFtsDB() *FtsDB {
 	// We connect to the database
 	conn, err := sql.Open("sqlite3", par.dbfile)
 	if err != nil {

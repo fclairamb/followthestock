@@ -11,7 +11,6 @@ import (
 )
 
 type FtsXmpp struct {
-	par       *Parameters
 	clt       *xmpp.Client
 	Recv      chan interface{}
 	Send      chan interface{}
@@ -22,9 +21,8 @@ type SendChat struct {
 	Remote, Text string
 }
 
-func NewFtsXmpp(par *Parameters) *FtsXmpp {
+func NewFtsXmpp() *FtsXmpp {
 	return &FtsXmpp{
-		par:       par,
 		Recv:      make(chan interface{}, 10),
 		Send:      make(chan interface{}, 10),
 		StartTime: time.Now().UTC(),
@@ -264,9 +262,9 @@ func (x *FtsXmpp) runMain() {
 			var err error
 			log.Println("Connecting...")
 			if par.notls {
-				x.clt, err = xmpp.NewClientNoTLS(x.par.server, x.par.username, x.par.password, x.par.debug)
+				x.clt, err = xmpp.NewClientNoTLS(par.server, par.username, par.password, par.debug)
 			} else {
-				x.clt, err = xmpp.NewClient(x.par.server, x.par.username, x.par.password, x.par.debug)
+				x.clt, err = xmpp.NewClient(par.server, par.username, par.password, par.debug)
 			}
 			if err != nil {
 				log.Println("Err:", err)
