@@ -1,6 +1,6 @@
 # Follow the stock
 
-It follows some stocks on [boursorama](http://www.bousorama.com) and send some alerts when it detects some changes over the subscribed percentage threshold.
+It follows some stocks on [boursorama](http://www.boursorama.com) and send some alerts when it detects some changes over the subscribed percentage threshold.
 
 # Command line interface
 
@@ -38,4 +38,4 @@ Here are valid stock formats:
 
 
 # Stocks data source
-The stocks are fetched from [boursorama](http://www.bousorama.com). It is not an official API, it might not be legal to fetch data and it might not work in the future.
+The stocks are fetched from [boursorama](http://www.boursorama.com). It is not an official API, it might not be legal to fetch data and it might not work in the future.
