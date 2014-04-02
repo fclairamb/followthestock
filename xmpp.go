@@ -210,11 +210,14 @@ Available commands are:
 		db.DeleteContact(contact)
 	} else if cmd == "!uptime" {
 		diff := time.Now().UTC().Sub(x.StartTime)
+		diff -= diff % time.Second
 		x.Send <- &SendChat{Remote: v.Remote, Text: fmt.Sprintf("Uptime: %s", diff)}
 	} else if cmd == "!quit" {
 		x.Send <- &SendChat{Remote: v.Remote, Text: "Bye bye!"}
 		time.Sleep(time.Second * 5)
 		waitForRc <- 1
+	} else if cmd == "!version" {
+		x.Send <- &SendChat{Remote: v.Remote, Text: "version = " + FTS_VERSION}
 	} else {
 		if cmd == "What" {
 			log.Println("Potential loophole")

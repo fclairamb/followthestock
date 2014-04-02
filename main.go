@@ -18,6 +18,8 @@ var par Parameters
 
 var waitForRc chan int
 
+const FTS_VERSION = "0.1"
+
 func init() {
 	waitForRc = make(chan int)
 }
