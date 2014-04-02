@@ -1,6 +1,6 @@
 # Follow the stock
 
-It follows some stocks on [boursorama](http://www.boursorama.com) and send some alerts when it detects some changes over the subscribed percentage threshold.
+It follows some stocks on [boursorama](http://www.boursorama.com) and send some alerts through XMPP when it detects some changes over the subscribed percentage threshold.
 
 # Command line interface
 
