@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"errors"
 	"time"
 )
 
@@ -249,6 +250,10 @@ func (s *Stock) GetValue() (value float32, err error) {
 		} else {
 			log.Println("Could not fetch cotation for", s.String())
 		}
+	}
+
+	if value == 0 { // zero check
+		return value, errors.New("Invalid zero value !")
 	}
 
 	return value, nil
