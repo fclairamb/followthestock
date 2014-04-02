@@ -49,15 +49,15 @@ func core() (rc int) {
 	db = NewFtsDB()
 	defer db.Close()
 
-	// We load the stocks
-	stocks = NewStocksMgmt()
-	stocks.Start()
-	defer stocks.Stop()
-
 	// We start the XMPP handling code
 	xm = NewFtsXmpp()
 	xm.Start()
 	defer xm.Stop()
+
+	// We load the stocks
+	stocks = NewStocksMgmt()
+	stocks.Start()
+	defer stocks.Stop()
 
 	// We block on the console handling code
 	go console_handling()
