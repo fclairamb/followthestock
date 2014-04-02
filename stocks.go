@@ -104,6 +104,7 @@ func (sf *StockFollower) considerValue(value float32) {
 			log.Println("Alert", al.Id, "- Trigger !")
 			al.LastValue = value
 			timeDiff := time.Duration(time.Now().UTC().UnixNano() - al.LastTriggered)
+			timeDiff -= timeDiff % time.Second
 			al.LastTriggered = time.Now().UTC().UnixNano()
 			var plus string
 			if per > 0 {
