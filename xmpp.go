@@ -72,7 +72,7 @@ Available commands are:
 		stock, err := stocks.GetStock(short)
 		if err == nil {
 			value, _ := stock.GetValue()
-			x.Send <- &SendChat{Remote: v.Remote, Text: fmt.Sprintf("Stock %s : %f", stock, value)}
+			x.Send <- &SendChat{Remote: v.Remote, Text: fmt.Sprintf("Stock %s : %.3f", stock, value)}
 		} else {
 			x.Send <- &SendChat{Remote: v.Remote, Text: fmt.Sprintf("Could not find stock %s: %v", short, err)}
 		}
@@ -151,7 +151,7 @@ Available commands are:
 				db.DeleteAlert(&al)
 				continue
 			}
-			msg += fmt.Sprintf("\n%s - %f%% [%d]", s.String(), al.Percent, al.Id)
+			msg += fmt.Sprintf("\n%s - %.2f%% [%d]", s.String(), al.Percent, al.Id)
 
 			if i%5 == 0 {
 				x.Send <- &SendChat{Remote: v.Remote, Text: msg}
@@ -237,7 +237,7 @@ func (x *FtsXmpp) runRecv() {
 			}
 			err := x.handle_chat(&v)
 			if err != nil {
-				x.Send <- &SendChat{Remote: v.Remote, Text: fmt.Sprintln("Error:", err)}
+				x.Send <- &SendChat{Remote: v.Remote, Text: fmt.Sprint("Error:", err)}
 			}
 		}
 	}

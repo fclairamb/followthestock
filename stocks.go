@@ -11,7 +11,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"errors"
 	"time"
 )
 
@@ -79,15 +78,13 @@ func (sf *StockFollower) considerValue(value float32) {
 			if contact == nil {
 				log.Println("Alert", al.Id, "- Contact missing, deleting alert !")
 				db.DeleteAlert(&al)
-				continue
 			}
 
-			message := fmt.Sprintf("%s : %f (first value to 50%% for testing) [%d]", sf.Stock.String(), value, al.Id)
-			xm.Send <- &SendChat{Remote: contact.Email, Text: message}
+			continue
 		}
 
 		diff := value - al.LastValue
-		per := diff / al.LastValue * 100
+		per := float32(math.Ceil(float64(diff/al.LastValue*10000)) / 100)
 		varPer := float32(math.Abs(float64(per)))
 		log.Println("Alert", al.Id, "-", sf.Stock, ":", varPer, "%")
 		if varPer >= al.Percent {
@@ -113,7 +110,7 @@ func (sf *StockFollower) considerValue(value float32) {
 			} else {
 				plus = ""
 			}
-			message := fmt.Sprintf("%s : %f (%s%f%%) in %v [%d]", sf.Stock.String(), value, plus, per, timeDiff, al.Id)
+			message := fmt.Sprintf("%s : %.3f (%s%.2f%%) in %v [%d]", sf.Stock.String(), value, plus, per, timeDiff, al.Id)
 			db.SaveAlert(&al)
 			xm.Send <- &SendChat{Remote: contact.Email, Text: message}
 		}
@@ -250,10 +247,6 @@ func (s *Stock) GetValue() (value float32, err error) {
 		} else {
 			log.Println("Could not fetch cotation for", s.String())
 		}
-	}
-
-	if value == 0 { // zero check
-		return value, errors.New("Invalid zero value !")
 	}
 
 	return value, nil
