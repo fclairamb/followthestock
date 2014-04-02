@@ -105,7 +105,7 @@ Available commands are:
 			return err
 		}
 
-		x.Send <- &SendChat{Remote: v.Remote, Text: fmt.Sprintf("Subscribed to %v with %f%% variation on alert %d.", stock, per, alert.Id)}
+		x.Send <- &SendChat{Remote: v.Remote, Text: fmt.Sprintf("Subscribed to %v with %.2f%% variation on alert %d.", stock, per, alert.Id)}
 
 	} else if cmd == "!u" {
 		if len(tokens) != 2 {
