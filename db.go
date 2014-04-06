@@ -11,10 +11,27 @@ import (
 
 type Stock struct {
 	// db tag lets you specify the column name if it differs from the struct field
-	Id     int64  `db:"stock_id"`
-	Market string `db:"market"` // "fr", "us"
-	Short  string `db:"short"`
-	Name   string `db:"name"`
+	Id       int64   `db:"stock_id"`
+	Market   string  `db:"market"` // "FR","US","W"
+	Short    string  `db:"short"`
+	Name     string  `db:"name"`
+	Value    float32 `db:"value"` // Last value
+	Currency string  `db:"currency"`
+}
+
+type CurrencyConversion struct {
+	From       string  `db:"from"`
+	To         string  `db:"to"`
+	Rate       float32 `db:"rate"`
+	LastUpdate int64   `db:"last_update"`
+}
+
+type ContactStockValue struct {
+	Id      int64   `db:"stock_value_id"`
+	Contact int64   `db:"contact_id"`
+	Stock   int64   `db:"stock_id"`
+	Nb      int32   `db:"nb"`
+	Value   float32 `db:"value"`
 }
 
 type Contact struct {
@@ -44,6 +61,15 @@ type FtsDB struct {
 	mapping    *gorp.DbMap
 }
 
+const (
+	TABLE_STOCK               = "stock"
+	TABLE_CONTACT             = "contact"
+	TABLE_VALUE               = "value"
+	TABLE_ALERT               = "alert"
+	TABLE_CONTACT_STOCK_VALUE = "contactstockvalue"
+	TABLE_CURRENCY_CONVERSION = "currency_conversion"
+)
+
 func NewFtsDB() *FtsDB {
 	// We connect to the database
 	conn, err := sql.Open("sqlite3", par.dbfile)
@@ -55,15 +81,24 @@ func NewFtsDB() *FtsDB {
 	dbmap := &gorp.DbMap{Db: conn, Dialect: gorp.SqliteDialect{}}
 
 	// We register the tables
-	dbmap.AddTableWithName(Stock{}, "stock").SetKeys(true, "Id")
-	dbmap.AddTableWithName(Contact{}, "contact").SetKeys(true, "Id")
-	dbmap.AddTableWithName(Value{}, "value").SetKeys(true, "Id")
-	dbmap.AddTableWithName(Alert{}, "alert").SetKeys(true, "Id")
+	dbmap.AddTableWithName(Stock{}, TABLE_STOCK).SetKeys(true, "Id")
+	dbmap.AddTableWithName(Contact{}, TABLE_CONTACT).SetKeys(true, "Id")
+	dbmap.AddTableWithName(Value{}, TABLE_VALUE).SetKeys(true, "Id")
+	dbmap.AddTableWithName(Alert{}, TABLE_ALERT).SetKeys(true, "Id")
+	dbmap.AddTableWithName(CurrencyConversion{}, TABLE_CURRENCY_CONVERSION).SetUniqueTogether("from", "to")
+	dbmap.AddTableWithName(ContactStockValue{}, TABLE_CONTACT_STOCK_VALUE).SetKeys(true, "Id")
 
 	// We create the tables
 	err = dbmap.CreateTablesIfNotExists()
 	if err != nil {
 		log.Fatal(err)
+	}
+
+	if false { // WAL is faster & safer
+		_, err = conn.Exec("pragma journal_mode = wal")
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
 
 	return &FtsDB{connection: conn, mapping: dbmap}
@@ -78,7 +113,7 @@ func (db *FtsDB) GetContactFromEmail(email string) *Contact {
 	email = strings.SplitN(email, "/", 2)[0]
 
 	c := &Contact{}
-	err := db.mapping.SelectOne(c, "select * from contact where email=?", email)
+	err := db.mapping.SelectOne(c, "select * from "+TABLE_CONTACT+" where email=?", email)
 	if err != nil {
 		log.Println("Creating contact ", email)
 		c.Email = email
@@ -93,7 +128,7 @@ func (db *FtsDB) GetContactFromEmail(email string) *Contact {
 
 func (db *FtsDB) GetContactFromId(id int64) *Contact {
 	c := &Contact{}
-	err := db.mapping.SelectOne(c, "select * from contact where contact_id=?", id)
+	err := db.mapping.SelectOne(c, "select * from "+TABLE_CONTACT+" where contact_id=?", id)
 	if err != nil {
 		c = nil
 	}
@@ -108,7 +143,7 @@ func (db *FtsDB) DeleteContact(c *Contact) (err error) {
 func (db *FtsDB) GetStock(market, short string) *Stock {
 	log.Printf("GetStock( \"%s\", \"%s\" );", market, short)
 	s := &Stock{}
-	err := db.mapping.SelectOne(s, "select * from stock where market=? and short=?", market, short)
+	err := db.mapping.SelectOne(s, "select * from "+TABLE_STOCK+" where market=? and short=?", market, short)
 
 	if err != nil {
 		return nil
@@ -119,7 +154,7 @@ func (db *FtsDB) GetStock(market, short string) *Stock {
 
 func (db *FtsDB) GetStockFromId(id int64) *Stock {
 	s := &Stock{}
-	err := db.mapping.SelectOne(s, "select * from stock where stock_id=?", id)
+	err := db.mapping.SelectOne(s, "select * from "+TABLE_STOCK+" where stock_id=?", id)
 	if err != nil {
 		return nil
 	} else {
@@ -129,18 +164,22 @@ func (db *FtsDB) GetStockFromId(id int64) *Stock {
 
 func (db *FtsDB) GetAlertsForStock(s *Stock) *[]Alert {
 	var alerts []Alert
-	db.mapping.Select(&alerts, "select * from alert where stock_id=?", s.Id)
+	db.mapping.Select(&alerts, "select * from "+TABLE_ALERT+" where stock_id=?", s.Id)
 	return &alerts
 }
 
 func (db *FtsDB) GetAllStocks() *[]Stock {
 	var stocks []Stock
-	db.mapping.Select(&stocks, "select * from stock")
+	db.mapping.Select(&stocks, "select * from "+TABLE_STOCK)
 	return &stocks
 }
 
-func (db *FtsDB) SaveStockValue(stock *Stock, value float32) {
-
+func (db *FtsDB) SaveStockValue(stock *Stock, value float32) error {
+	if stock.Value != value {
+		stock.Value = value
+		return db.SaveStock(stock)
+	}
+	return nil
 }
 
 func (db *FtsDB) SubscribeAlert(s *Stock, c *Contact, per float32) (alert *Alert, err error) {
@@ -158,7 +197,7 @@ func (db *FtsDB) SubscribeAlert(s *Stock, c *Contact, per float32) (alert *Alert
 }
 
 func (db *FtsDB) UnsubscribeAlert(s *Stock, c *Contact) (ok bool, err error) {
-	_, err = db.mapping.Exec("delete from alert where stock_id=? and contact_id=?", s.Id, c.Id)
+	_, err = db.mapping.Exec("delete from "+TABLE_ALERT+" where stock_id=? and contact_id=?", s.Id, c.Id)
 	return
 }
 
@@ -182,7 +221,7 @@ func (db *FtsDB) SaveAlert(a *Alert) (err error) {
 
 func (db *FtsDB) GetAlertsForContact(c *Contact) *[]Alert {
 	var alerts []Alert
-	db.mapping.Select(&alerts, "select * from alert where contact_id=?", c.Id)
+	db.mapping.Select(&alerts, "select * from "+TABLE_ALERT+" where contact_id=?", c.Id)
 	return &alerts
 }
 
@@ -198,6 +237,55 @@ func (df *FtsDB) SaveStock(s *Stock) error {
 	} else {
 		return db.mapping.Insert(s)
 	}
+}
+
+func (db *FtsDB) GetContactStockValue(c *Contact, s *Stock) *ContactStockValue {
+	csv := &ContactStockValue{Contact: c.Id, Stock: s.Id}
+	log.Printf("csv = %#v", csv)
+	if err := db.mapping.SelectOne(csv, "select * from "+TABLE_CONTACT_STOCK_VALUE+" where contact_id=? and stock_id=?", csv.Contact, csv.Stock); err != nil {
+		log.Print(err)
+	}
+	return csv
+}
+
+func (db *FtsDB) GetContactStockValuesFromContact(c *Contact) *[]ContactStockValue {
+	var values []ContactStockValue
+	db.mapping.Select(&values, "select * from "+TABLE_CONTACT_STOCK_VALUE+" where contact_id=?", c.Id)
+	return &values
+}
+
+func (db *FtsDB) SaveContactStockValue(csv *ContactStockValue) error {
+	if csv.Id != 0 {
+		_, err := db.mapping.Update(csv)
+		return err
+	} else {
+		return db.mapping.Insert(csv)
+	}
+
+}
+
+func (db *FtsDB) DeleteContactStockValue(s *ContactStockValue) (err error) {
+	_, err = db.mapping.Delete(s)
+	return
+}
+
+func (db *FtsDB) GetCurrencyConversion(from, to string) *CurrencyConversion {
+	c := &CurrencyConversion{}
+	err := db.mapping.SelectOne(c, "select * from "+TABLE_CURRENCY_CONVERSION+" where from=? and to=?", from, to)
+	if err == nil {
+		return c
+	} else {
+		return nil
+	}
+}
+
+func (db *FtsDB) SaveCurrencyConversion(c *CurrencyConversion) error {
+	return db.mapping.Insert(c)
+}
+
+func (db *FtsDB) DeleteCurrencyConversion(c *CurrencyConversion) (err error) {
+	_, err = db.mapping.Delete(c)
+	return
 }
 
 func (s *Stock) String() string {

@@ -34,6 +34,8 @@ func (x *FtsXmpp) handle_chat(v *xmpp.Chat) (err error) {
 		return nil
 	}
 
+	v.Text = strings.TrimSpace(v.Text)
+
 	/* No XOR
 	if strings.HasPrefix(v.Text, "test ") ^ x.par.test {
 		log.Println("Wrong mode (test or no test)")
@@ -50,16 +52,18 @@ func (x *FtsXmpp) handle_chat(v *xmpp.Chat) (err error) {
 		x.Send <- &SendChat{Remote: v.Remote, Text: `
 Available commands are:
 
-!help             - This command
-!s <stock> <per>  - Subscribe to variation about a stock
-!u <stock>        - Unsubscribe from a stock
-!g <stock>        - Get data about a stock
-!ls               - List currently monitored stocks
-!pause <days>     - Pause alerts for X days
-!resume           - Resume alerts
-!uptime           - Server uptime
-!ping <data>      - Ping test
-!me               - Display data about yourself
+!help                    - This command
+!s <stock> <per>         - Subscribe to variation about a stock
+!u <stock>               - Unsubscribe from a stock
+!g <stock>               - Get data about a stock
+!ls                      - List currently monitored stocks
+!v                       - Get the value of our stocks
+!v <stock>               - Get the value of a particular stock
+!v <stock> <nb> (<cost>) - Register the number of shares and the cost of a particular stock
+!pause <days>            - Pause alerts for X days
+!resume                  - Resume alerts
+!uptime                  - Application uptime
+!ping <data>             - Ping test
 `}
 	} else if cmd == "!me" {
 		contact := db.GetContactFromEmail(v.Remote)
@@ -78,7 +82,7 @@ Available commands are:
 		}
 	} else if cmd == "!s" {
 		if len(tokens) != 3 {
-			return errors.New("You must precise stock and percentage !")
+			return errors.New("You must specify stock and percentage !")
 		}
 		short := tokens[1]
 
@@ -161,10 +165,107 @@ Available commands are:
 		if i == 0 {
 			x.Send <- &SendChat{Remote: v.Remote, Text: "You didn't subscribe to anything !"}
 		}
-		if len(msg) != 0 {
+		if msg != "" {
 			x.Send <- &SendChat{Remote: v.Remote, Text: msg}
-			msg = ""
 		}
+	} else if cmd == "!v" {
+
+		// We get the contact
+		contact := db.GetContactFromEmail(v.Remote)
+		if contact == nil {
+			return errors.New("Could not get contact !")
+		}
+
+		if len(tokens) > 1 {
+			// We get the stock
+			stock, err := stocks.GetStock(tokens[1])
+			if err != nil {
+				return err
+			}
+
+			save := false
+
+			log.Printf("stock = %#v", stock)
+
+			csv := db.GetContactStockValue(contact, stock)
+
+			log.Printf("We got %#v", csv)
+
+			if len(tokens) >= 3 {
+				v, err := strconv.ParseInt(tokens[2], 10, 32)
+				if err != nil {
+					return err
+				}
+				csv.Nb = int32(v)
+				save = true
+			}
+
+			if len(tokens) >= 4 {
+				v, err := strconv.ParseFloat(tokens[3], 32)
+				if err != nil {
+					return err
+				}
+				csv.Value = float32(v)
+				save = true
+			}
+
+			if save {
+				if err := db.SaveContactStockValue(csv); err != nil {
+					return err
+				}
+
+				x.Send <- &SendChat{Remote: v.Remote, Text: fmt.Sprintf("Saved %s with %d x %.02f = %.02f [%d]", stock, csv.Nb, csv.Value, (float32(csv.Nb) * csv.Value), csv.Id)}
+			}
+		}
+
+		{ // We send the the message
+			i := 0
+			msg := ""
+			totalCost := float32(0)
+			totalValue := float32(0)
+			for _, csv := range *db.GetContactStockValuesFromContact(contact) {
+				s := db.GetStockFromId(csv.Stock)
+				if s == nil {
+					db.DeleteContactStockValue(&csv)
+					continue
+				}
+
+				i++
+
+				cost := float32(csv.Nb) * csv.Value
+				value := float32(csv.Nb) * s.Value
+
+				totalCost += cost
+				totalValue += value
+
+				diff := value - cost
+				per := diff * 100 / cost
+				plus := "+"
+
+				if per < 0 {
+					plus = ""
+				}
+
+				msg += fmt.Sprintf(
+					"\n%s x %d share: %.03f / %.03f - value: %.03f - %.03f = %s%.03f / %s%.02f%%",
+					s.String(), csv.Nb, s.Value, csv.Value, value, cost, plus, diff, plus, per)
+
+				if i%5 == 0 {
+					x.Send <- &SendChat{Remote: v.Remote, Text: msg}
+					msg = ""
+				}
+
+			}
+			if i == 0 {
+				x.Send <- &SendChat{Remote: v.Remote, Text: "You didn't register any stock value."}
+			} else {
+				totalDiff := totalValue - totalCost
+				per := totalDiff * 100 / totalCost
+				msg += fmt.Sprintf("\nTotal: %.03f - %.03f = %.03f / %.02f%%", totalValue, totalCost, totalDiff, per)
+			}
+			x.Send <- &SendChat{Remote: v.Remote, Text: msg}
+		}
+
 	} else if cmd == "!pause" {
 		if len(tokens) != 2 {
 			return errors.New("You have to specify a number of days !")
@@ -301,5 +402,4 @@ func (x *FtsXmpp) Start() {
 }
 
 func (x *FtsXmpp) Stop() {
-
 }

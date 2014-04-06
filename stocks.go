@@ -66,6 +66,11 @@ func (sf *StockFollower) run() {
 }
 
 func (sf *StockFollower) considerValue(value float32) {
+	if value == 0 {
+		log.Println("WARNING: We have to ignore zero value for stock %v.", sf.Stock)
+		return
+	}
+
 	db.SaveStockValue(sf.Stock, value)
 	for _, al := range *db.GetAlertsForStock(sf.Stock) {
 		if al.LastValue == 0 {
@@ -274,6 +279,10 @@ func (sm *StocksMgmt) GetStock(short string) (s *Stock, e error) {
 	if s == nil {
 		s, e = tryNewStock(market, short)
 		if e == nil {
+			s.Value, e = s.GetValue()
+			if e != nil {
+				log.Print(e)
+			}
 			db.SaveStock(s)
 		}
 	}
