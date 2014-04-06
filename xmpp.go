@@ -185,11 +185,7 @@ Available commands are:
 
 			save := false
 
-			log.Printf("stock = %#v", stock)
-
-			csv := db.GetContactStockValue(contact, stock)
-
-			log.Printf("We got %#v", csv)
+			csv := db.GetContactStockValue(contact.Id, stock.Id)
 
 			if len(tokens) >= 3 {
 				v, err := strconv.ParseInt(tokens[2], 10, 32)
@@ -197,7 +193,11 @@ Available commands are:
 					return err
 				}
 				csv.Nb = int32(v)
-				save = true
+				if csv.Nb > 0 {
+					save = true
+				} else {
+					db.DeleteContactStockValue(csv)
+				}
 			}
 
 			if len(tokens) >= 4 {
@@ -206,7 +206,6 @@ Available commands are:
 					return err
 				}
 				csv.Value = float32(v)
-				save = true
 			}
 
 			if save {
@@ -247,7 +246,7 @@ Available commands are:
 				}
 
 				msg += fmt.Sprintf(
-					"\n%s x %d share: %.03f / %.03f - value: %.03f - %.03f = %s%.03f / %s%.02f%%",
+					"\n%s, %d shares, value: %.03f / %.03f, total: %.03f - %.03f = %s%.03f (%s%.02f%%)",
 					s.String(), csv.Nb, s.Value, csv.Value, value, cost, plus, diff, plus, per)
 
 				if i%5 == 0 {
@@ -261,7 +260,7 @@ Available commands are:
 			} else {
 				totalDiff := totalValue - totalCost
 				per := totalDiff * 100 / totalCost
-				msg += fmt.Sprintf("\nTotal: %.03f - %.03f = %.03f / %.02f%%", totalValue, totalCost, totalDiff, per)
+				msg += fmt.Sprintf("\nTotal: %.03f - %.03f = %.03f (%.02f%%)", totalValue, totalCost, totalDiff, per)
 			}
 			x.Send <- &SendChat{Remote: v.Remote, Text: msg}
 		}
@@ -333,7 +332,6 @@ Available commands are:
 func (x *FtsXmpp) runRecv() {
 	for {
 		msg := <-x.Recv
-		//log.Println("Recv:", msg)
 		switch v := msg.(type) {
 		case xmpp.Chat:
 			if v.Text != "" {

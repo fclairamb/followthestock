@@ -89,7 +89,7 @@ func (sf *StockFollower) considerValue(value float32) {
 		}
 
 		diff := value - al.LastValue
-		per := float32(math.Ceil(float64(diff/al.LastValue*10000)) / 100)
+		per := diff / al.LastValue * 100
 		varPer := float32(math.Abs(float64(per)))
 		log.Println("Alert", al.Id, "-", sf.Stock, ":", varPer, "%")
 		if varPer >= al.Percent {
@@ -115,8 +115,24 @@ func (sf *StockFollower) considerValue(value float32) {
 			} else {
 				plus = ""
 			}
-			message := fmt.Sprintf("%s : %.3f (%s%.2f%%) in %v [%d]", sf.Stock.String(), value, plus, per, timeDiff, al.Id)
+			message := fmt.Sprintf("%s : %.3f (%s%.2f%%) in %v", sf.Stock.String(), value, plus, per, timeDiff)
 			db.SaveAlert(&al)
+
+			// We might be able to give some valuation data
+			if csv := db.GetContactStockValue(al.Contact, al.Stock); csv != nil {
+				cost := float32(csv.Nb) * csv.Value
+				value := float32(csv.Nb) * value
+				diff := value - cost
+				per := diff / cost * 100
+				if per > 0 {
+					plus = "+"
+				} else {
+					plus = ""
+				}
+
+				message += fmt.Sprintf(" / %.3f - %.3f = %s%.3f (%s%.2f%%)", value, cost, plus, diff, plus, per)
+			}
+
 			xm.Send <- &SendChat{Remote: contact.Email, Text: message}
 		}
 	}
