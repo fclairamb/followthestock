@@ -27,9 +27,10 @@ Each client can send the following commands:
 * `!u <stock>` - Unsubscribe from a stock
 * `!g <stock>` - Get data about a stock
 * `!ls` - List currently monitored stocks
+* `!v <stock> <nb> <cost>` - Register the cost of our current stocks to calculate the added value
 * `!pause <days>` - Pause alerts for X days
 * `!resume` - Resume alerts
-* `!uptime` - Server uptime
+* `!uptime` - Bot uptime
 
 Here are valid stock formats:
 * `RNO` is like `FR:RNO`, which is the french "RENAULT" stock
