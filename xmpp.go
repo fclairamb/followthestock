@@ -36,13 +36,6 @@ func (x *FtsXmpp) handle_chat(v *xmpp.Chat) (err error) {
 
 	v.Text = strings.TrimSpace(v.Text)
 
-	/* No XOR
-	if strings.HasPrefix(v.Text, "test ") ^ x.par.test {
-		log.Println("Wrong mode (test or no test)")
-		return
-	}
-	*/
-
 	tokens := strings.SplitN(v.Text, " ", -1)
 	cmd := tokens[0]
 

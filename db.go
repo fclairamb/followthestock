@@ -94,7 +94,7 @@ func NewFtsDB() *FtsDB {
 		log.Fatal(err)
 	}
 
-	{ // WAL is faster & safer
+	if false { // WAL is faster & safer
 		_, err = conn.Exec("pragma journal_mode = wal")
 		if err != nil {
 			log.Fatal(err)
@@ -242,7 +242,7 @@ func (df *FtsDB) SaveStock(s *Stock) error {
 func (db *FtsDB) GetContactStockValue(contactId, stockId int64) *ContactStockValue {
 	csv := &ContactStockValue{Contact: contactId, Stock: stockId}
 	if err := db.mapping.SelectOne(csv, "select * from "+TABLE_CONTACT_STOCK_VALUE+" where contact_id=? and stock_id=?", csv.Contact, csv.Stock); err != nil {
-		log.Print(err)
+		return nil
 	}
 	return csv
 }
