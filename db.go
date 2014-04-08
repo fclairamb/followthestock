@@ -288,3 +288,7 @@ func (db *FtsDB) DeleteCurrencyConversion(c *CurrencyConversion) (err error) {
 func (s *Stock) String() string {
 	return "\"" + s.Name + "\" (" + s.Market + ":" + s.Short + ")"
 }
+
+func (csv *ContactStockValue) Exists() bool {
+	return csv.Id != 0
+}

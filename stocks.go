@@ -119,7 +119,7 @@ func (sf *StockFollower) considerValue(value float32) {
 			db.SaveAlert(&al)
 
 			// We might be able to give some valuation data
-			if csv := db.GetContactStockValue(al.Contact, al.Stock); csv != nil {
+			if csv := db.GetContactStockValue(al.Contact, al.Stock); csv.Exists() {
 				cost := float32(csv.Nb) * csv.Value
 				value := float32(csv.Nb) * value
 				diff := value - cost
