@@ -279,60 +279,35 @@ func NewStocksMgmt() *StocksMgmt {
 	return sm
 }
 
-func (sm *StocksMgmt) GetStock(short string) (s *Stock, e error) {
-	short = strings.ToUpper(short)
-	market := "FR"
-	precise := false
-	tokens := strings.SplitN(short, ":", 2)
-	if len(tokens) == 2 {
-		precise = true
-		market = tokens[0]
-		short = tokens[1]
-	}
+var marketsToTest = [...]string{"FR", "US", "W"}
 
+func (sm *StocksMgmt) getOrCreateStock(market, short string) (s *Stock, e error) {
 	s = db.GetStock(market, short)
-
-	if s == nil {
-		s, e = tryNewStock(market, short)
-		if e == nil {
-			s.Value, e = s.GetValue()
-			if e != nil {
-				log.Print(e)
-			}
+	if s == nil { // If we couldn't get it
+		s, e = tryNewStock(market, short) // We try to get it
+		if s != nil {
+			s.Value, e = s.GetValue() // And we get the value
 			db.SaveStock(s)
 		}
 	}
+	return
+}
 
-	if !precise && s == nil {
-		market = "US"
-		s = db.GetStock(market, short)
+func (sm *StocksMgmt) GetStock(short string) (s *Stock, e error) {
+	short = strings.ToUpper(short)
+	tokens := strings.SplitN(short, ":", 2)
 
-		if s == nil {
-			s, e = tryNewStock(market, short)
-			if e == nil {
-				db.SaveStock(s)
+	if len(tokens) == 2 { // Specific market stock
+		market := tokens[0]
+		short = tokens[1]
+		s, e = sm.getOrCreateStock(market, short)
+	} else { // Unspecified market stock
+		for _, market := range marketsToTest { // We test all stocks
+			s, e = sm.getOrCreateStock(market, short)
+			if s != nil {
+				break
 			}
-		} else {
-			log.Printf("Stock: %v", s)
 		}
-	}
-
-	if !precise && s == nil {
-		market = "W"
-		s = db.GetStock(market, short)
-
-		if s == nil {
-			s, e = tryNewStock(market, short)
-			if e == nil {
-				db.SaveStock(s)
-			}
-		} else {
-			log.Printf("Stock: %v", s)
-		}
-	}
-
-	if s != nil {
-		e = nil
 	}
 
 	return
