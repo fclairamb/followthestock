@@ -33,7 +33,7 @@ func init() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	reCotation, err = regexp.Compile("<span class=\"cotation\">([0-9\\ \\.]+)[^<>]*[A-Z]{2,3}</span>")
+	reCotation, err = regexp.Compile("<span class=\"cotation\">([0-9\\ \\.]+)[^A-Z<>]*([A-Z]{2,3})</span>")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -48,11 +48,11 @@ func NewStockFollower(s *Stock) *StockFollower {
 func (sf *StockFollower) run() {
 	t := time.Now().UTC() //.UnixNano()
 	for {
-		v, err := sf.Stock.GetValue()
+		v, _, err := sf.Stock.GetValue()
 		if err != nil {
 			log.Println("Stock", sf.Stock, "error", err)
 		} else {
-			log.Println("Stock", sf.Stock, "=", v)
+			log.Println("Stock", sf.Stock, "=", v, sf.Stock.Currency)
 			sf.considerValue(v)
 		}
 		if par.exact {
@@ -233,28 +233,28 @@ func (s *Stock) getBoursoramaSymbol() (symbol string) {
 	return
 }
 
-func (s *Stock) GetValue() (value float32, err error) {
+func (s *Stock) GetValue() (value float32, currency string, err error) {
 	var body string
 	{ // We get the page's content
 		resp, err := httpGet(fmt.Sprintf("http://www.boursorama.com/cours.phtml?symbole=%s", s.getBoursoramaSymbol()))
 		if err != nil {
-			return -1, err
+			return -1, "", err
 		}
 		defer resp.Body.Close()
 		if resp.StatusCode != 200 {
-			return -1, errors.New(fmt.Sprintf("Wrong status code %d", resp.StatusCode))
+			return -1, "", errors.New(fmt.Sprintf("Wrong status code %d", resp.StatusCode))
 		}
 
 		finalUrl := resp.Request.URL.String()
 
 		if strings.Contains(finalUrl, "recherche") {
-			return -1, errors.New(fmt.Sprintf("Not found !"))
+			return -1, "", errors.New(fmt.Sprintf("Not found !"))
 		}
 
 		{
 			raw, err := ioutil.ReadAll(resp.Body)
 			if err != nil {
-				return -1, err
+				return -1, "", err
 			}
 			body = string(raw)
 		}
@@ -265,12 +265,13 @@ func (s *Stock) GetValue() (value float32, err error) {
 		if len(result) >= 2 {
 			v, _ := strconv.ParseFloat(strings.Replace(result[1], " ", "", -1), 32)
 			value = float32(v)
+			currency = result[2]
 		} else {
 			log.Println("Could not fetch cotation for", s.String())
 		}
 	}
 
-	return value, nil
+	return
 }
 
 func NewStocksMgmt() *StocksMgmt {
@@ -286,9 +287,12 @@ func (sm *StocksMgmt) getOrCreateStock(market, short string) (s *Stock, e error)
 	if s == nil { // If we couldn't get it
 		s, e = tryNewStock(market, short) // We try to get it
 		if s != nil {
-			s.Value, e = s.GetValue() // And we get the value
+			s.Value, s.Currency, e = s.GetValue() // And we get the value
 			db.SaveStock(s)
 		}
+	} else if s.Currency == "" {
+		_, s.Currency, _ = s.GetValue()
+		db.SaveStock(s)
 	}
 	return
 }

@@ -7,13 +7,14 @@ import (
 )
 
 type Parameters struct {
-	dbfile   string
-	server   string
-	username string
-	password string
-	notls    bool
-	debug    bool
-	exact    bool
+	dbfile            string
+	server            string
+	username          string
+	password          string
+	notls             bool
+	debug             bool
+	exact             bool
+	nbLinesPerMessage int
 }
 
 func ParametersParse(par *Parameters) {
@@ -24,6 +25,7 @@ func ParametersParse(par *Parameters) {
 	flag.BoolVar(&par.notls, "notls", false, "Disable TLS")
 	flag.BoolVar(&par.debug, "debug", false, "Enable debugging")
 	flag.BoolVar(&par.exact, "exact", false, "Exact timing")
+	flag.IntVar(&par.nbLinesPerMessage, "nb", 15, "Number of lines per message")
 
 	flag.Usage = func() {
 		fmt.Fprintln(os.Stderr, "usage: followthestock -username toto@gmail.com -password pass")

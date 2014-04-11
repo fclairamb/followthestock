@@ -68,8 +68,8 @@ Available commands are:
 		short := tokens[1]
 		stock, err := stocks.GetStock(short)
 		if err == nil {
-			value, _ := stock.GetValue()
-			x.Send <- &SendChat{Remote: v.Remote, Text: fmt.Sprintf("Stock %s : %.3f", stock, value)}
+			value, _, _ := stock.GetValue()
+			x.Send <- &SendChat{Remote: v.Remote, Text: fmt.Sprintf("Stock %s : %.3f %s", stock, value, stock.Currency)}
 		} else {
 			x.Send <- &SendChat{Remote: v.Remote, Text: fmt.Sprintf("Could not find stock %s: %v", short, err)}
 		}
@@ -150,7 +150,7 @@ Available commands are:
 			}
 			msg += fmt.Sprintf("\n%s - %.2f%% [%d]", s.String(), al.Percent, al.Id)
 
-			if i%5 == 0 {
+			if i%par.nbLinesPerMessage == 0 {
 				x.Send <- &SendChat{Remote: v.Remote, Text: msg}
 				msg = ""
 			}
@@ -242,7 +242,7 @@ Available commands are:
 					"\n%s, %d shares, value: %.03f / %.03f, total: %.03f - %.03f = %s%.03f (%s%.02f%%)",
 					s.String(), csv.Nb, s.Value, csv.Value, value, cost, plus, diff, plus, per)
 
-				if i%5 == 0 {
+				if i%par.nbLinesPerMessage == 0 {
 					x.Send <- &SendChat{Remote: v.Remote, Text: msg}
 					msg = ""
 				}
