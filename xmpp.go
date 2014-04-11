@@ -239,8 +239,8 @@ Available commands are:
 				}
 
 				msg += fmt.Sprintf(
-					"\n%s, %d shares, value: %.03f / %.03f, total: %.03f - %.03f = %s%.03f (%s%.02f%%)",
-					s.String(), csv.Nb, s.Value, csv.Value, value, cost, plus, diff, plus, per)
+					"\n%s, %d shares, value: %.03f / %.03f, total: %.03f - %.03f = %s%.03f %s (%s%.02f%%)",
+					s.String(), csv.Nb, s.Value, csv.Value, value, cost, plus, diff, s.Currency, plus, per)
 
 				if i%par.nbLinesPerMessage == 0 {
 					x.Send <- &SendChat{Remote: v.Remote, Text: msg}
@@ -253,7 +253,12 @@ Available commands are:
 			} else {
 				totalDiff := totalValue - totalCost
 				per := totalDiff * 100 / totalCost
-				msg += fmt.Sprintf("\nTotal: %.03f - %.03f = %.03f (%.02f%%)", totalValue, totalCost, totalDiff, per)
+				plus := "+"
+
+				if per < 0 {
+					plus = ""
+				}
+				msg += fmt.Sprintf("\nTotal: %.03f - %.03f = %.03f %s (%s%.02f%%)", totalValue, totalCost, totalDiff, "EUR", plus, per)
 			}
 			x.Send <- &SendChat{Remote: v.Remote, Text: msg}
 		}
