@@ -109,13 +109,7 @@ func (sf *StockFollower) considerValue(value float32) {
 			timeDiff := time.Duration(time.Now().UTC().UnixNano() - al.LastTriggered)
 			timeDiff -= timeDiff % time.Second
 			al.LastTriggered = time.Now().UTC().UnixNano()
-			var plus string
-			if per > 0 {
-				plus = "+"
-			} else {
-				plus = ""
-			}
-			message := fmt.Sprintf("%s : %.3f (%s%.2f%%) in %v", sf.Stock.String(), value, plus, per, timeDiff)
+			message := fmt.Sprintf("%s : %.3f (%+.2f%%) in %v", sf.Stock.String(), value, per, timeDiff)
 			db.SaveAlert(&al)
 
 			// We might be able to give some valuation data
@@ -124,13 +118,7 @@ func (sf *StockFollower) considerValue(value float32) {
 				value := float32(csv.Nb) * value
 				diff := value - cost
 				per := diff / cost * 100
-				if per > 0 {
-					plus = "+"
-				} else {
-					plus = ""
-				}
-
-				message += fmt.Sprintf(" / %.3f - %.3f = %s%.3f (%s%.2f%%)", value, cost, plus, diff, plus, per)
+				message += fmt.Sprintf(" / %.3f - %.3f = %+.3f (%+.2f%%)", value, cost, diff, per)
 			}
 
 			xm.Send <- &SendChat{Remote: contact.Email, Text: message}
