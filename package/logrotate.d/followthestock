@@ -1,0 +1,12 @@
+/var/log/followthestock/*.log {
+	delaycompress
+	daily
+	rotate 365
+	missingok
+	
+	postrotate
+		# We trigger log file re-opening
+		# killall -SIGUSR2 supervisord
+	endscript
+}
+
