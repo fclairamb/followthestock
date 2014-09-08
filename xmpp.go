@@ -29,7 +29,7 @@ func NewFtsXmpp() *FtsXmpp {
 		Recv:         make(chan interface{}, 10),
 		Send:         make(chan interface{}, 10),
 		StartTime:    time.Now().UTC(),
-		checkTicker:  time.NewTicker(time.Minute),
+		checkTicker:  time.NewTicker(time.Minute * 5),
 		lastRcvdData: time.Now().UTC(),
 	}
 }
@@ -404,6 +404,7 @@ func (x *FtsXmpp) runCheck() {
 	for {
 		<-x.checkTicker.C
 		elapsed := time.Now().UTC().Sub(x.lastRcvdData)
+		log.Printf("Last received data: %v / %v", x.lastRcvdData, elapsed)
 		if elapsed > time.Minute*30 {
 			log.Printf("WARNING: We haven't received anything for %v. We're quitting, hoping to be restarted !", elapsed)
 			os.Exit(5)
