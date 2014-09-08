@@ -2,7 +2,7 @@
 all: followthestock
 
 followthestock: *.go
-	go get -v ; go build -v
+	go get -v ; go build -v -o followthestock
 
 install:
 	# Config
