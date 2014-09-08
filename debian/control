@@ -1,0 +1,14 @@
+Source: followthestock
+Section: net
+Priority: optional
+Maintainer: Florent Clairambault <florent@clairambault.fr>
+Build-Depends: debhelper (>= 8.0.0)
+Standards-Version: 3.9.4
+Homepage: https://github.com/fclairamb/followthestock
+Vcs-Git: git@github.com:fclairamb/followthestock.git
+Vcs-Browser: https://github.com/fclairamb/followthestock
+
+Package: followthestock
+Architecture: any
+Depends: supervisor
+Description: Stocks monitoring program
