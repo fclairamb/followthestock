@@ -1,3 +1,9 @@
+followthestock (0.1-2) unstable; urgency=low
+
+  * Allowing to change the watchdog activity timeout.
+
+ -- Florent Clairambault <florent@xps>  Mon, 08 Sep 2014 21:52:27 +0200
+
 followthestock (0.1-1) unstable; urgency=low
 
   * First packaging
