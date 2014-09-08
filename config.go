@@ -10,12 +10,13 @@ import (
 
 type Config struct {
 	Xmpp struct {
-		Server          string
-		Username        string
-		Password        string
-		Notls           bool
-		Debug           bool
-		LinesPerMessage int
+		Server                  string
+		Username                string
+		Password                string
+		Notls                   bool
+		Debug                   bool
+		LinesPerMessage         int
+		ActivityWatchdogMinutes int
 	}
 
 	General struct {
@@ -33,6 +34,7 @@ func NewConfig() *Config {
 	config.Xmpp.Username = ""
 	config.Xmpp.Server = "talk.google.com:443"
 	config.Xmpp.LinesPerMessage = 15
+	config.Xmpp.ActivityWatchdogMinutes = 30
 
 	var fileName string
 	var showConfig bool

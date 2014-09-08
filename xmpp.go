@@ -405,7 +405,7 @@ func (x *FtsXmpp) runCheck() {
 		<-x.checkTicker.C
 		elapsed := time.Now().UTC().Sub(x.lastRcvdData)
 		log.Printf("Last received data: %v / %v", x.lastRcvdData, elapsed)
-		if elapsed > time.Minute*30 {
+		if elapsed > time.Minute*time.Duration(config.Xmpp.ActivityWatchdogMinutes) {
 			log.Printf("WARNING: We haven't received anything for %v. We're quitting, hoping to be restarted !", elapsed)
 			os.Exit(5)
 		}
