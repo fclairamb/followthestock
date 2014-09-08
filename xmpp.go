@@ -5,16 +5,19 @@ import (
 	"fmt"
 	"github.com/mattn/go-xmpp"
 	"log"
+	"os"
 	"strconv"
 	"strings"
 	"time"
 )
 
 type FtsXmpp struct {
-	clt       *xmpp.Client
-	Recv      chan interface{}
-	Send      chan interface{}
-	StartTime time.Time
+	clt          *xmpp.Client
+	Recv         chan interface{}
+	Send         chan interface{}
+	StartTime    time.Time
+	lastRcvdData time.Time
+	checkTicker  *time.Ticker
 }
 
 type SendChat struct {
@@ -23,9 +26,11 @@ type SendChat struct {
 
 func NewFtsXmpp() *FtsXmpp {
 	return &FtsXmpp{
-		Recv:      make(chan interface{}, 10),
-		Send:      make(chan interface{}, 10),
-		StartTime: time.Now().UTC(),
+		Recv:         make(chan interface{}, 10),
+		Send:         make(chan interface{}, 10),
+		StartTime:    time.Now().UTC(),
+		checkTicker:  time.NewTicker(time.Minute),
+		lastRcvdData: time.Now().UTC(),
 	}
 }
 
@@ -150,7 +155,7 @@ Available commands are:
 			}
 			msg += fmt.Sprintf("\n%s - %.2f%% [%d]", s.String(), al.Percent, al.Id)
 
-			if i%par.nbLinesPerMessage == 0 {
+			if i%config.Xmpp.LinesPerMessage == 0 {
 				x.Send <- &SendChat{Remote: v.Remote, Text: msg}
 				msg = ""
 			}
@@ -206,7 +211,7 @@ Available commands are:
 					return err
 				}
 
-				x.Send <- &SendChat{Remote: v.Remote, Text: fmt.Sprintf("Saved %s with %d x %.02f = %.02f [%d]", stock, csv.Nb, csv.Value, (float32(csv.Nb) * csv.Value), csv.Id)}
+				x.Send <- &SendChat{Remote: v.Remote, Text: fmt.Sprintf("Saved %s with %d x %.02f = %.02f %s [%d]", stock, csv.Nb, csv.Value, (float32(csv.Nb) * csv.Value), stock.Currency, csv.Id)}
 			}
 		}
 
@@ -237,7 +242,7 @@ Available commands are:
 					"\n%s, %d shares, value: %.03f / %.03f, total: %.03f - %.03f = %+.03f %s (%+.02f%%)",
 					s.String(), csv.Nb, s.Value, csv.Value, value, cost, diff, s.Currency, per)
 
-				if i%par.nbLinesPerMessage == 0 {
+				if i%config.Xmpp.LinesPerMessage == 0 {
 					x.Send <- &SendChat{Remote: v.Remote, Text: msg}
 					msg = ""
 				}
@@ -320,6 +325,7 @@ Available commands are:
 func (x *FtsXmpp) runRecv() {
 	for {
 		msg := <-x.Recv
+		x.lastRcvdData = time.Now().UTC()
 		switch v := msg.(type) {
 		case xmpp.Chat:
 			if v.Text != "" {
@@ -329,6 +335,8 @@ func (x *FtsXmpp) runRecv() {
 			if err != nil {
 				x.Send <- &SendChat{Remote: v.Remote, Text: fmt.Sprint("Error:", err)}
 			}
+		default:
+			log.Printf("[XMPP] Received: %v", msg)
 		}
 	}
 }
@@ -340,6 +348,10 @@ func (x *FtsXmpp) runSend() {
 		switch v := msg.(type) {
 		case *SendChat:
 			log.Printf("[CHAT] %s <-- \"%s\"", v.Remote, v.Text)
+			for x.clt == nil {
+				log.Printf("Cannot send on a nil XMPP !")
+				time.Sleep(5)
+			}
 			x.clt.Send(xmpp.Chat{Type: "chat", Remote: v.Remote, Text: v.Text})
 		}
 	}
@@ -351,11 +363,15 @@ func (x *FtsXmpp) runMain() {
 		for { // We try to connect in loops, but the time between connections grows with failures
 			var err error
 			log.Println("Connecting...")
-			if par.notls {
-				x.clt, err = xmpp.NewClientNoTLS(par.server, par.username, par.password, par.debug)
+
+			xmpp.DefaultConfig.InsecureSkipVerify = true
+
+			if config.Xmpp.Notls {
+				x.clt, err = xmpp.NewClientNoTLS(config.Xmpp.Server, config.Xmpp.Username, config.Xmpp.Password, config.Xmpp.Debug)
 			} else {
-				x.clt, err = xmpp.NewClient(par.server, par.username, par.password, par.debug)
+				x.clt, err = xmpp.NewClient(config.Xmpp.Server, config.Xmpp.Username, config.Xmpp.Password, config.Xmpp.Debug)
 			}
+
 			if err != nil {
 				log.Println("Err:", err)
 				log.Printf("Sleeping %d seconds...", sleep/time.Second)
@@ -366,6 +382,7 @@ func (x *FtsXmpp) runMain() {
 				}
 			} else {
 				log.Println("Connected !")
+				sleep = time.Second * 2
 				break
 			}
 		}
@@ -381,10 +398,24 @@ func (x *FtsXmpp) runMain() {
 	}
 }
 
+func (x *FtsXmpp) runCheck() {
+	// It seems the GO-XMPP library has a bug that occurs rarely. As I currently couldn't diagnose it precisely,
+	// i'm adding a watchdog code
+	for {
+		<-x.checkTicker.C
+		elapsed := time.Now().UTC().Sub(x.lastRcvdData)
+		if elapsed > time.Minute*30 {
+			log.Printf("WARNING: We haven't received anything for %v. We're quitting, hoping to be restarted !", elapsed)
+			os.Exit(5)
+		}
+	}
+}
+
 func (x *FtsXmpp) Start() {
 	go x.runMain()
 	go x.runRecv()
 	go x.runSend()
+	go x.runCheck()
 }
 
 func (x *FtsXmpp) Stop() {

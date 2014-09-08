@@ -55,7 +55,7 @@ func (sf *StockFollower) run() {
 			log.Println("Stock", sf.Stock, "=", v, sf.Stock.Currency)
 			sf.considerValue(v)
 		}
-		if par.exact {
+		if config.General.ExactTiming {
 			t = t.Add(sleepTime) //.Nanoseconds()
 			sl := t.Sub(time.Now().UTC())
 			time.Sleep(sl)

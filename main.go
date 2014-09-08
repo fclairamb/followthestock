@@ -14,7 +14,7 @@ var xm *FtsXmpp
 var db *FtsDB
 var stocks *StocksMgmt
 
-var par Parameters
+var config *Config
 
 var waitForRc chan int
 
@@ -41,7 +41,7 @@ func console_handling() {
 		} else if tokens[0] == "quit" {
 			waitForRc <- 0
 		} else {
-			fmt.Printf("\"%s\" not understood !", tokens[0])
+			fmt.Printf("\"%s\" not understood !\n", tokens[0])
 		}
 	}
 }
@@ -77,7 +77,7 @@ func main() {
 	log.Println("Starting !")
 
 	// We parse the parameters
-	ParametersParse(&par)
+	config = NewConfig()
 
 	rc := core()
 

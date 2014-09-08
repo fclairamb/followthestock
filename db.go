@@ -72,7 +72,7 @@ const (
 
 func NewFtsDB() *FtsDB {
 	// We connect to the database
-	conn, err := sql.Open("sqlite3", par.dbfile)
+	conn, err := sql.Open("sqlite3", config.Db.File)
 	if err != nil {
 		log.Fatal(err)
 	}
