@@ -61,8 +61,10 @@ func core() (rc int) {
 	stocks.Start()
 	defer stocks.Stop()
 
-	// We block on the console handling code
-	go console_handling()
+	if Console {
+		// We block on the console handling code
+		go console_handling()
+	}
 
 	// We wait for someone to trigger the result code
 	rc = <-waitForRc

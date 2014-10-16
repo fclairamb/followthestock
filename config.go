@@ -28,6 +28,8 @@ type Config struct {
 	}
 }
 
+var Console bool
+
 func NewConfig() *Config {
 	config := &Config{}
 	config.Db.File = "followthestock.db"
@@ -40,6 +42,7 @@ func NewConfig() *Config {
 	var showConfig bool
 	flag.StringVar(&fileName, "config", "/etc/followthestock/followthestock.conf", "Config file")
 	flag.BoolVar(&showConfig, "show-config", false, "Show config")
+	flag.BoolVar(&Console, "console", false, "Use console")
 
 	flag.Usage = func() {
 		fmt.Fprintln(os.Stderr, "usage: followthestock -config <file>")

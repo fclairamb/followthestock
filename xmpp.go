@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/mattn/go-xmpp"
 	"log"
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -406,8 +405,9 @@ func (x *FtsXmpp) runCheck() {
 		elapsed := time.Now().UTC().Sub(x.lastRcvdData)
 		log.Printf("Last received data: %v / %v", x.lastRcvdData, elapsed)
 		if elapsed > time.Minute*time.Duration(config.Xmpp.ActivityWatchdogMinutes) {
-			log.Printf("WARNING: We haven't received anything for %v. We're quitting, hoping to be restarted !", elapsed)
-			os.Exit(5)
+			message := fmt.Sprintf("WARNING: We haven't received anything for %v. We're quitting, hoping to be restarted !", elapsed)
+			log.Printf(message)
+			panic(message)
 		}
 	}
 }

@@ -152,10 +152,10 @@ func httpGet(url string) (*http.Response, error) {
 
 func fetchBoursoramaPageFomSymbol(symbol string) (body string, err error) {
 	resp, err := httpGet(fmt.Sprintf("http://www.boursorama.com/cours.phtml?symbole=%s", symbol))
-	defer resp.Body.Close()
 	if err != nil {
 		return "", err
 	}
+	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
 		return "", errors.New(fmt.Sprintf("Wrong status code %d", resp.StatusCode))
 	}
@@ -208,14 +208,19 @@ func tryNewStock(market, short string) (*Stock, error) {
 	return s, nil
 }
 
+var marketsToTest = [...]string{"FR", "US", "US2", "W"}
+
 func (s *Stock) getBoursoramaSymbol() (symbol string) {
-	if s.Market == "US" {
+	switch s.Market {
+	case "US": // NASDAQ & NYSE
 		symbol = s.Short
-	} else if s.Market == "FR" {
+	case "US2": // XETRA ?
+		symbol = "1z" + s.Short
+	case "FR": // NYSE Euro
 		symbol = "1rP" + s.Short
-	} else if s.Market == "W" {
+	case "W": // Warrants
 		symbol = "2rP" + s.Short
-	} else {
+	default:
 		log.Fatal("Unknown market: " + s.Market)
 	}
 	return
@@ -254,8 +259,10 @@ func (s *Stock) GetValue() (value float32, currency string, err error) {
 			v, _ := strconv.ParseFloat(strings.Replace(result[1], " ", "", -1), 32)
 			value = float32(v)
 			currency = result[2]
+			s.FailedFetches = 0
 		} else {
-			log.Println("Could not fetch cotation for", s.String())
+			s.FailedFetches += 1
+			log.Printf("Could not fetch cotation %s for the %dth time.", s, s.FailedFetches)
 		}
 	}
 
@@ -267,8 +274,6 @@ func NewStocksMgmt() *StocksMgmt {
 
 	return sm
 }
-
-var marketsToTest = [...]string{"FR", "US", "W"}
 
 func (sm *StocksMgmt) getOrCreateStock(market, short string) (s *Stock, e error) {
 	s = db.GetStock(market, short)

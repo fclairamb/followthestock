@@ -11,12 +11,13 @@ import (
 
 type Stock struct {
 	// db tag lets you specify the column name if it differs from the struct field
-	Id       int64   `db:"stock_id"`
-	Market   string  `db:"market"` // "FR","US","W"
-	Short    string  `db:"short"`
-	Name     string  `db:"name"`
-	Value    float32 `db:"value"` // Last value
-	Currency string  `db:"currency"`
+	Id            int64   `db:"stock_id"`
+	Market        string  `db:"market"` // "FR","US","US2",W"
+	Short         string  `db:"short"`
+	Name          string  `db:"name"`
+	Value         float32 `db:"value"` // Last value
+	Currency      string  `db:"currency"`
+	FailedFetches int64   `db:"failed_fetches"`
 }
 
 type CurrencyConversion struct {

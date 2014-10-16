@@ -1,3 +1,12 @@
+followthestock (0.2) unstable; urgency=low
+
+  * Adding US2 market
+  * Fixing a bug with failed request creating a nil crash
+  * Console is now a CLI option and disabled by default
+  * Adding a count of failed fetches to remove currencies that are deleted
+
+ -- Florent Clairambault <florent@xps>  Fri, 17 Oct 2014 00:13:25 +0200
+
 followthestock (0.1-2) unstable; urgency=low
 
   * Allowing to change the watchdog activity timeout.

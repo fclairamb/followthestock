@@ -5,11 +5,11 @@ exists=false
 getent passwd followthestock >/dev/null 2>&1 && exists=true
 
 if ! $exists; then
-    printf "Creating user followthestock..."
-    useradd -b /var/lib/followthestock -d /var/lib/followthestock -U followthestock && printf " OK\n" || printf "FAILED\n"
+    printf "Creating user followthestock... "
+    useradd -b /var/lib/followthestock -d /var/lib/followthestock -U followthestock && printf "OK\n" || printf "FAILED\n"
 fi
 
-printf "Fixing user rights..."
+printf "Fixing user rights... "
 chown -R followthestock:followthestock /var/lib/followthestock /var/log/followthestock && printf "OK\n" || printf "FAILED\n"
 
 printf "Starting supervisor services...\n"
