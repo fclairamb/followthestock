@@ -1,3 +1,10 @@
+followthestock (0.2-2) unstable; urgency=low
+
+  * Fixed named fetching REGEX
+  * Fetching name and currency automatically when we don't have them
+
+ -- Florent Clairambault <florent@xps>  Sun, 19 Oct 2014 00:57:11 +0200
+
 followthestock (0.2-1) unstable; urgency=low
 
   * Added database upgrade support

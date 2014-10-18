@@ -25,7 +25,7 @@ var (
 
 func init() {
 	var err error
-	reName1, err = regexp.Compile("(?s)<h1>.*title=\"([^\\\"]+)\".*</h1>")
+	reName1, err = regexp.Compile("(?s)<meta itemprop=\"name\" content=\"([^\\\"]+)\" />")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -263,6 +263,17 @@ func (s *Stock) GetValue() (value float32, currency string, err error) {
 		} else {
 			s.FailedFetches += 1
 			log.Printf("Could not fetch cotation %s for the %dth time.", s, s.FailedFetches)
+		}
+	}
+
+	if s.Name == "" || s.Currency == "" { // We get the name if we couldn't get it earlier
+		if s2, err := tryNewStock(s.Market, s.Short); err == nil {
+			if s.Name == "" && s2.Name != "" {
+				s.Name = s2.Name
+			}
+			if s.Currency == "" && s2.Currency != "" {
+				s.Currency = s2.Currency
+			}
 		}
 	}
 
