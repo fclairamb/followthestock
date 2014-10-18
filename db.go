@@ -3,11 +3,18 @@ package main
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 	"github.com/coopernurse/gorp"
 	_ "github.com/mattn/go-sqlite3"
 	"log"
+	"strconv"
 	"strings"
 )
+
+type Parameter struct {
+	Name  string `db:"name"`
+	Value string `db:"value"`
+}
 
 type Stock struct {
 	// db tag lets you specify the column name if it differs from the struct field
@@ -57,12 +64,18 @@ type Alert struct {
 	Percent       float32 `db:"percent"`
 }
 
+type DatabaseUpgrade struct {
+	Version int
+	Sql     []string
+}
+
 type FtsDB struct {
 	connection *sql.DB
 	mapping    *gorp.DbMap
 }
 
 const (
+	TABLE_PARAMETER           = "parameter"
 	TABLE_STOCK               = "stock"
 	TABLE_CONTACT             = "contact"
 	TABLE_VALUE               = "value"
@@ -82,6 +95,7 @@ func NewFtsDB() *FtsDB {
 	dbmap := &gorp.DbMap{Db: conn, Dialect: gorp.SqliteDialect{}}
 
 	// We register the tables
+	dbmap.AddTableWithName(Parameter{}, TABLE_PARAMETER).SetKeys(false, "Name")
 	dbmap.AddTableWithName(Stock{}, TABLE_STOCK).SetKeys(true, "Id")
 	dbmap.AddTableWithName(Contact{}, TABLE_CONTACT).SetKeys(true, "Id")
 	dbmap.AddTableWithName(Value{}, TABLE_VALUE).SetKeys(true, "Id")
@@ -95,14 +109,53 @@ func NewFtsDB() *FtsDB {
 		log.Fatal(err)
 	}
 
-	if false { // WAL is faster & safer
+	{ // WAL is faster & safer
 		_, err = conn.Exec("pragma journal_mode = wal")
 		if err != nil {
 			log.Fatal(err)
 		}
 	}
 
-	return &FtsDB{connection: conn, mapping: dbmap}
+	db := &FtsDB{connection: conn, mapping: dbmap}
+
+	db.Upgrade()
+
+	return db
+}
+
+// Performs an automatic database upgrade
+func (db *FtsDB) Upgrade() {
+	upgrades := []*DatabaseUpgrade{
+		&DatabaseUpgrade{ // First upgrade: add a failed_fetches column
+			Version: 1,
+			Sql: []string{
+				`alter table ` + TABLE_STOCK + ` add column "failed_fetches" integer default 0`,
+			},
+		},
+	}
+
+	// We get the current version
+	version := 0
+	if sVersion := db.GetParameter("db_version"); sVersion != nil {
+		version, _ = strconv.Atoi(*sVersion)
+	}
+
+	// We perform automatic upgrades
+	for _, up := range upgrades {
+		if version < up.Version {
+			version = up.Version
+			for _, sql := range up.Sql {
+				log.Printf(`Performing SQL upgrade... "%s"`, sql)
+				if _, err := db.connection.Exec(sql); err != nil {
+					log.Printf(`Failed to apply query "%s" and error: %s`, sql, err)
+				} else {
+					log.Printf("OK !")
+				}
+			}
+			// We want to save the version as soon as possible.
+			db.SetParameter("db_version", fmt.Sprintf("%d", version))
+		}
+	}
 }
 
 func (db FtsDB) Close() {
@@ -274,6 +327,27 @@ func (db *FtsDB) GetCurrencyConversion(from, to string) *CurrencyConversion {
 		return c
 	} else {
 		return nil
+	}
+}
+
+func (db *FtsDB) GetParameter(name string) *string {
+	var value string
+	if err := db.mapping.SelectOne(&value, "select value from "+TABLE_PARAMETER+" where name = ?", name); err == nil {
+		return &value
+	} else {
+		return nil
+	}
+}
+
+func (db *FtsDB) SetParameter(name, value string) error {
+	p := &Parameter{Name: name, Value: value}
+	if nb, err := db.mapping.Update(p); err == nil {
+		if nb == 0 {
+			err = db.mapping.Insert(p)
+		}
+		return err
+	} else {
+		return err
 	}
 }
 
