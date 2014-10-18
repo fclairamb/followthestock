@@ -6,17 +6,29 @@ It follows some stocks on [boursorama](http://www.boursorama.com) and send some 
 
 Here are the command line interfaces arguments to start the app:
 
-    ./followthestock --help
-    usage: followthestock -username toto@gmail.com -password pass
-      -dbfile="followthestock.db": database file
-      -debug=false: Enable debugging
-      -exact=false: Exact timing
-      -notls=false: Disable TLS
-      -password="SuperStock": XMPP Password
-      -server="talk.google.com:443": XMPP Server
-      -username="followthestock@gmail.com": XMPP Username
-      
-The `-exact` option enforces a precise (1 minute) period between calls.
+    usage: followthestock -config <file>
+      -config="/etc/followthestock/followthestock.conf": Config file
+      -console=false: Use console
+      -show-config=false: Show config
+
+# Config file
+
+The config file looks something like that:
+
+    [general]
+    exactTiming = false
+    
+    [xmpp]
+    username = <username>
+    password = <password>
+    server = talk.google.com:443
+    notls = false
+    debug = true
+    activityWatchdogMinutes = 30
+
+    [db]
+    # In the current working directory (should be /var/lib/followthestock)
+    file = followthestock.db
 
 # Client comands
 
