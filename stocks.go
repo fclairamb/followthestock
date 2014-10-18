@@ -253,28 +253,45 @@ func (s *Stock) GetValue() (value float32, currency string, err error) {
 		}
 	}
 
+	save := false
+
 	{ // Value
 		result := reCotation.FindStringSubmatch(body)
 		if len(result) >= 2 {
 			v, _ := strconv.ParseFloat(strings.Replace(result[1], " ", "", -1), 32)
 			value = float32(v)
 			currency = result[2]
-			s.FailedFetches = 0
+			if s.FailedFetches != 0 {
+				s.FailedFetches = 0
+				log.Printf("Updating %v's failed fetches", s)
+				save = true
+			}
+			if s.Currency == "" && currency != "" {
+				s.Currency = currency
+				log.Printf("Updating %v's currency", s)
+				save = true
+			}
 		} else {
 			s.FailedFetches += 1
 			log.Printf("Could not fetch cotation %s for the %dth time.", s, s.FailedFetches)
+			save = true
 		}
 	}
 
 	if s.Name == "" || s.Currency == "" { // We get the name if we couldn't get it earlier
+		log.Printf("Trying to update data about %v", s)
 		if s2, err := tryNewStock(s.Market, s.Short); err == nil {
 			if s.Name == "" && s2.Name != "" {
+				log.Printf("Updating %v's name", s)
 				s.Name = s2.Name
-			}
-			if s.Currency == "" && s2.Currency != "" {
-				s.Currency = s2.Currency
+				save = true
 			}
 		}
+	}
+
+	if save {
+		log.Printf("Updating stock %#v ...", s)
+		db.SaveStock(s)
 	}
 
 	return
