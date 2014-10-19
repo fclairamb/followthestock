@@ -1,3 +1,10 @@
+followthestock (0.2-4) unstable; urgency=low
+
+  * Fixed failed fetches counter
+  * Adding automatic deletion of unfetchable stocks
+
+ -- Florent Clairambault <florent@xps>  Sun, 19 Oct 2014 13:39:27 +0200
+
 followthestock (0.2-3) unstable; urgency=low
 
   * Bugfix: Saving stock when modified

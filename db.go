@@ -159,7 +159,9 @@ func (db *FtsDB) Upgrade() {
 }
 
 func (db FtsDB) Close() {
-	db.connection.Close()
+	if err := db.connection.Close(); err != nil {
+		log.Printf("connection.Close(): %v", err)
+	}
 }
 
 func (db *FtsDB) GetContactFromEmail(email string) *Contact {
@@ -191,7 +193,15 @@ func (db *FtsDB) GetContactFromId(id int64) *Contact {
 
 func (db *FtsDB) DeleteContact(c *Contact) (err error) {
 	_, err = db.mapping.Delete(c)
-	return
+	return err
+}
+
+func (db *FtsDB) DeleteStock(s *Stock) error {
+	for _, a := range *db.GetAlertsForStock(s) {
+		db.DeleteAlert(&a)
+	}
+	_, err := db.connection.Exec("delete from "+TABLE_STOCK+" where stock_id=?", s.Id)
+	return err
 }
 
 func (db *FtsDB) GetStock(market, short string) *Stock {
@@ -284,7 +294,7 @@ func (db *FtsDB) DeleteAlert(a *Alert) (err error) {
 	return
 }
 
-func (df *FtsDB) SaveStock(s *Stock) error {
+func (db *FtsDB) SaveStock(s *Stock) error {
 	if s.Id != 0 {
 		_, e := db.mapping.Update(s)
 		return e

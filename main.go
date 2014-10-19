@@ -18,7 +18,7 @@ var config *Config
 
 var waitForRc chan int
 
-const FTS_VERSION = "0.1"
+const FTS_VERSION = "0.2"
 
 func init() {
 	waitForRc = make(chan int)
@@ -70,6 +70,8 @@ func core() (rc int) {
 	rc = <-waitForRc
 
 	log.Println("Stopping !")
+
+	db.Close()
 
 	return
 }

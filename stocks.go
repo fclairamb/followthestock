@@ -226,56 +226,62 @@ func (s *Stock) getBoursoramaSymbol() (symbol string) {
 	return
 }
 
-func (s *Stock) GetValue() (value float32, currency string, err error) {
-	var body string
-	{ // We get the page's content
-		resp, err := httpGet(fmt.Sprintf("http://www.boursorama.com/cours.phtml?symbole=%s", s.getBoursoramaSymbol()))
-		if err != nil {
-			return -1, "", err
-		}
-		defer resp.Body.Close()
-		if resp.StatusCode != 200 {
-			return -1, "", errors.New(fmt.Sprintf("Wrong status code %d", resp.StatusCode))
-		}
-
-		finalUrl := resp.Request.URL.String()
-
-		if strings.Contains(finalUrl, "recherche") {
-			return -1, "", errors.New(fmt.Sprintf("Not found !"))
-		}
-
-		{
-			raw, err := ioutil.ReadAll(resp.Body)
-			if err != nil {
-				return -1, "", err
-			}
-			body = string(raw)
-		}
+func (s *Stock) fetchPage() (string, error) {
+	resp, err := httpGet(fmt.Sprintf("http://www.boursorama.com/cours.phtml?symbole=%s", s.getBoursoramaSymbol()))
+	if err != nil {
+		return "", err
 	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		return "", errors.New(fmt.Sprintf("Wrong status code %d", resp.StatusCode))
+	}
+
+	finalUrl := resp.Request.URL.String()
+
+	if strings.Contains(finalUrl, "recherche") {
+		return "", errors.New(fmt.Sprintf("Not found !"))
+	}
+
+	{
+		raw, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return "", err
+		}
+		body := string(raw)
+		return body, nil
+	}
+}
+
+func (s *Stock) GetValue() (value float32, currency string, err error) {
+	body, err := s.fetchPage()
 
 	save := false
 
-	{ // Value
-		result := reCotation.FindStringSubmatch(body)
-		if len(result) >= 2 {
-			v, _ := strconv.ParseFloat(strings.Replace(result[1], " ", "", -1), 32)
-			value = float32(v)
-			currency = result[2]
-			if s.FailedFetches != 0 {
-				s.FailedFetches = 0
-				log.Printf("Updating %v's failed fetches", s)
-				save = true
-			}
-			if s.Currency == "" && currency != "" {
-				s.Currency = currency
-				log.Printf("Updating %v's currency", s)
-				save = true
-			}
-		} else {
-			s.FailedFetches += 1
-			log.Printf("Could not fetch cotation %s for the %dth time.", s, s.FailedFetches)
+	result := reCotation.FindStringSubmatch(body)
+	if len(result) >= 2 {
+		v, _ := strconv.ParseFloat(strings.Replace(result[1], " ", "", -1), 32)
+		value = float32(v)
+		currency = result[2]
+		if s.FailedFetches != 0 {
+			s.FailedFetches = 0
+			log.Printf("Updating %v's failed fetches", s)
 			save = true
 		}
+		if s.Currency == "" && currency != "" {
+			s.Currency = currency
+			log.Printf("Updating %v's currency", s)
+			save = true
+		}
+	} else {
+		s.FailedFetches += 1
+		log.Printf("Could not fetch cotation %s for the %dth time.", s, s.FailedFetches)
+		if s.FailedFetches > 1000 {
+			log.Printf("Deleting stock %#v ...", s)
+			db.DeleteStock(s)
+		} else {
+			save = true
+		}
+
 	}
 
 	if s.Name == "" || s.Currency == "" { // We get the name if we couldn't get it earlier
