@@ -200,7 +200,7 @@ func (db *FtsDB) DeleteStock(s *Stock) error {
 	for _, a := range *db.GetAlertsForStock(s) {
 		db.DeleteAlert(&a)
 	}
-	_, err := db.connection.Exec("delete from "+TABLE_STOCK+" where stock_id=?", s.Id)
+	_, err := db.mapping.Delete(s)
 	return err
 }
 
