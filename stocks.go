@@ -7,6 +7,7 @@ import (
 	"log"
 	"math"
 	"net/http"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -19,26 +20,20 @@ type StockFollower struct {
 }
 
 var (
-	reName1, reName2, reCotation *regexp.Regexp
-	sleepTime                    time.Duration
+	reCotation *regexp.Regexp
+	reName     []*regexp.Regexp
+	sleepTime  time.Duration = time.Minute
 )
 
-func init() {
-	var err error
-	reName1, err = regexp.Compile("(?s)<meta itemprop=\"name\" content=\"([^\\\"]+)\" />")
-	if err != nil {
-		log.Fatal(err)
-	}
-	reName2, err = regexp.Compile("(?s)<h1>.*<a.*>(.*)</a>.*</h1>")
-	if err != nil {
-		log.Fatal(err)
-	}
-	reCotation, err = regexp.Compile("<span class=\"cotation\">([0-9\\ \\.]+)[^A-Z<>]*([A-Z]{2,3})</span>")
-	if err != nil {
-		log.Fatal(err)
-	}
+const TEMPDIR = "/tmp/followthestock/"
 
-	sleepTime = time.Minute
+func init() {
+	reCotation = regexp.MustCompile("<span class=\"cotation\">([0-9\\ \\.]+)[^A-Z<>]*([A-Z]{2,3})</span>")
+
+	reName = []*regexp.Regexp{
+		regexp.MustCompile("(?s)<[^>]* itemprop=\"name\" title=\"([^\\\"]+)\"[^>]*>"),
+		regexp.MustCompile("(?s)<h1>.*<a.*>(.*)</a>.*</h1>"),
+	}
 }
 
 func NewStockFollower(s *Stock) *StockFollower {
@@ -178,7 +173,7 @@ func fetchBoursoramaPageFomSymbol(symbol string) (body string, err error) {
 }
 
 func tryNewStock(market, short string) (*Stock, error) {
-	log.Println(fmt.Sprintf("tryNewStock( \"%s\", \"%s\" );", market, short))
+	log.Printf("tryNewStock( \"%s\", \"%s\" );", market, short)
 	s := &Stock{Market: market, Short: short}
 
 	body, err := fetchBoursoramaPageFomSymbol(s.getBoursoramaSymbol())
@@ -187,28 +182,30 @@ func tryNewStock(market, short string) (*Stock, error) {
 		return nil, errors.New(fmt.Sprintf("No \"%s\" on %s market !", short, market))
 	}
 
-	{ // First attempt for standard quotations
-		result := reName1.FindStringSubmatch(body)
-		if len(result) > 1 {
-			s.Name = result[1]
-		}
-	}
-
-	if len(s.Name) == 0 { // Second attempt for other quotations
-		result := reName2.FindStringSubmatch(body)
+	for _, re := range reName { // Second attempt for other quotations
+		result := re.FindStringSubmatch(body)
 		if len(result) > 1 {
 			s.Name = strings.Trim(result[1], " \n\r")
+			break
+		} else {
+			log.Printf("Regex failed: %s", re)
 		}
 	}
 
 	if len(s.Name) == 0 { // If we still couldn't get a name
+		// We will save the raw data for future testing
+		os.MkdirAll(TEMPDIR, 0755)
+		fileName := fmt.Sprintf("%s/%s_%s.html", TEMPDIR, s.Market, s.Short)
+		if err := ioutil.WriteFile(fileName, []byte(body), 0644); err != nil {
+			log.Printf("Could not write %s: %s", fileName, err)
+		}
 		return s, errors.New("Could not get the name")
 	}
 
 	return s, nil
 }
 
-var marketsToTest = [...]string{"FR", "US", "US2", "W"}
+var marketsToTest = [...]string{"FR", "AM", "US", "US2", "W"}
 
 func (s *Stock) getBoursoramaSymbol() (symbol string) {
 	switch s.Market {
@@ -216,8 +213,10 @@ func (s *Stock) getBoursoramaSymbol() (symbol string) {
 		symbol = s.Short
 	case "US2": // XETRA ?
 		symbol = "1z" + s.Short
-	case "FR": // NYSE Euro
+	case "FR": // EURONEXT Paris
 		symbol = "1rP" + s.Short
+	case "AM": // EURONEXT Amsterdam
+		symbol = "1rA" + s.Short
 	case "W": // Warrants
 		symbol = "2rP" + s.Short
 	default:
@@ -285,7 +284,7 @@ func (s *Stock) GetValue() (value float32, currency string, err error) {
 	}
 
 	if s.Name == "" || s.Currency == "" { // We get the name if we couldn't get it earlier
-		log.Printf("Trying to update data about %v", s)
+		log.Printf("Missing name or currency, trying to update data about %v", s)
 		if s2, err := tryNewStock(s.Market, s.Short); err == nil {
 			if s.Name == "" && s2.Name != "" {
 				log.Printf("Updating %v's name", s)
