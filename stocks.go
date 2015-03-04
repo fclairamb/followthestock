@@ -212,7 +212,7 @@ func tryNewStock(market, short string) (*Stock, error) {
 
 var marketsToTest = [...]string{"FR", "AM", "US", "US2", "W"}
 
-func (s *Stock) getBoursoramaSymbol() (symbol string) {
+func (s *Stock) boursoramaSymbol() (symbol string) {
 	switch s.Market {
 	case "US": // NASDAQ & NYSE
 		symbol = s.Short
@@ -231,11 +231,11 @@ func (s *Stock) getBoursoramaSymbol() (symbol string) {
 }
 
 func (this *Stock) Url() string {
-	return fmt.Sprintf("http://www.boursorama.com/cours.phtml?symbole=%s", this.getBoursoramaSymbol())
+	return fmt.Sprintf("http://www.boursorama.com/cours.phtml?symbole=%s", this.boursoramaSymbol())
 }
 
 func (s *Stock) fetchPage() (string, error) {
-	resp, err := httpGet(fmt.Sprintf("http://www.boursorama.com/cours.phtml?symbole=%s", s.getBoursoramaSymbol()))
+	resp, err := httpGet(fmt.Sprintf("http://www.boursorama.com/cours.phtml?symbole=%s", s.boursoramaSymbol()))
 	if err != nil {
 		return "", err
 	}
