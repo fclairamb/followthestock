@@ -105,6 +105,11 @@ func (sf *StockFollower) considerValue(value float32) {
 			timeDiff -= timeDiff % time.Second
 			al.LastTriggered = time.Now().UTC().UnixNano()
 			message := fmt.Sprintf("%s : %.3f (%+.2f%%) in %v", sf.Stock.String(), value, per, timeDiff)
+
+			if contact.ShowUrl {
+				message += " / " + sf.Stock.Url()
+			}
+
 			db.SaveAlert(&al)
 
 			// We might be able to give some valuation data
@@ -145,8 +150,8 @@ func httpGet(url string) (*http.Response, error) {
 	return r, e
 }
 
-func fetchBoursoramaPageFomSymbol(symbol string) (body string, err error) {
-	resp, err := httpGet(fmt.Sprintf("http://www.boursorama.com/cours.phtml?symbole=%s", symbol))
+func (this *Stock) PageContent() (body string, err error) {
+	resp, err := httpGet(this.Url())
 	if err != nil {
 		return "", err
 	}
@@ -176,7 +181,7 @@ func tryNewStock(market, short string) (*Stock, error) {
 	log.Printf("tryNewStock( \"%s\", \"%s\" );", market, short)
 	s := &Stock{Market: market, Short: short}
 
-	body, err := fetchBoursoramaPageFomSymbol(s.getBoursoramaSymbol())
+	body, err := s.PageContent()
 
 	if err != nil {
 		return nil, errors.New(fmt.Sprintf("No \"%s\" on %s market !", short, market))
@@ -223,6 +228,10 @@ func (s *Stock) getBoursoramaSymbol() (symbol string) {
 		log.Fatal("Unknown market: " + s.Market)
 	}
 	return
+}
+
+func (this *Stock) Url() string {
+	return fmt.Sprintf("http://www.boursorama.com/cours.phtml?symbole=%s", this.getBoursoramaSymbol())
 }
 
 func (s *Stock) fetchPage() (string, error) {

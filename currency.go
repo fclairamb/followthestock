@@ -4,28 +4,15 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
 )
 
-const (
-	CURRENCY_EXPIRATION = int64(time.Minute) * 15
-)
+const CURRENCY_EXPIRATION = int64(time.Minute) * 15
 
-var (
-	reRate *regexp.Regexp
-)
-
-func init() {
-	var err error
-	reRate, err = regexp.Compile("<span class=\"cotation\">([0-9\\ \\.]+)[^<>]*[A-Z]{2,3}</span>")
-	if err != nil {
-		log.Fatal(err)
-	}
-}
+var reRate = regexp.MustCompile("<span class=\"cotation\">([0-9\\ \\.]+)[^<>]*[A-Z]{2,3}</span>")
 
 func fetchCurrencyRate(from, to string) (float32, error) {
 	resp, err := httpGet(fmt.Sprintf("http://www.boursorama.com/taux-de-change-x-%s-%s", from, to))

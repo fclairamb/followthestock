@@ -60,6 +60,8 @@ Available commands are:
 !pause <days>            - Pause alerts for X days
 !resume                  - Resume alerts
 !uptime                  - Application uptime
+!url                     - Show an URL with alerts
+!nourl                   - Do not show an URL with alerts
 !ping <data>             - Ping test
 `}
 	} else if cmd == "!me" {
@@ -289,7 +291,16 @@ Available commands are:
 		contact.PauseUntil = 0
 
 		db.SaveContact(contact)
-		x.Send <- &SendChat{Remote: v.Remote, Text: "OK, back to work!"}
+		x.Send <- &SendChat{Remote: v.Remote, Text: "OK, back to work !"}
+	} else if cmd == "!url" || cmd == "!nourl" {
+		contact := db.GetContactFromEmail(v.Remote)
+		if contact == nil {
+			return errors.New("Could not get contact !")
+		}
+
+		contact.ShowUrl = (cmd == "!url")
+		db.SaveContact(contact)
+		x.Send <- &SendChat{Remote: v.Remote, Text: fmt.Sprintf("OK (ShowUrl=%v)", contact.ShowUrl)}
 	} else if cmd == "!forgetme" {
 		contact := db.GetContactFromEmail(v.Remote)
 

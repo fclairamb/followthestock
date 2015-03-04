@@ -46,6 +46,7 @@ type Contact struct {
 	Id         int64  `db:"contact_id"`
 	Email      string `db:"email"`
 	PauseUntil int64  `db:"pause_until"`
+	ShowUrl    bool   `db:"show_url"`
 }
 
 type Value struct {
@@ -130,6 +131,12 @@ func (db *FtsDB) Upgrade() {
 			Version: 1,
 			Sql: []string{
 				`alter table ` + TABLE_STOCK + ` add column "failed_fetches" integer default 0`,
+			},
+		},
+		&DatabaseUpgrade{ // First upgrade: add a failed_fetches column
+			Version: 2,
+			Sql: []string{
+				`alter table ` + TABLE_CONTACT + ` add column "show_url" integer default 1`,
 			},
 		},
 	}
