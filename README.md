@@ -52,3 +52,7 @@ Here are valid stock formats:
 
 # Stocks data source
 The stocks are fetched from [boursorama](http://www.boursorama.com). It is not an official API, it might not be legal to fetch data and it might not work in the future.
+
+# Debian packages
+Debian packages are automatically generated here:
+ http://94.23.55.152/followthestock/dist/package/
