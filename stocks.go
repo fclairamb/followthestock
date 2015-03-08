@@ -87,7 +87,18 @@ func (sf *StockFollower) considerValue(value float32) {
 		per := diff / al.LastValue * 100
 		varPer := float32(math.Abs(float64(per)))
 		log.Println("Alert", al.Id, "-", sf.Stock, ":", varPer, "%")
-		if varPer >= al.Percent {
+
+		var triggered bool
+		switch al.PercentDirection {
+		case ALERT_DIRECTION_BOTH:
+			triggered = (varPer >= al.Percent)
+		case ALERT_DIRECTION_UP:
+			triggered = (per > al.Percent)
+		case ALERT_DIRECTION_DOWN:
+			triggered = (per < al.Percent)
+		}
+
+		if triggered {
 			contact := db.GetContactFromId(al.Contact)
 			if contact == nil {
 				log.Println("Alert", al.Id, "- Contact missing, deleting alert !")
@@ -370,8 +381,8 @@ func (sm *StocksMgmt) LoadStocks() (err error) {
 	return nil
 }
 
-func (sm *StocksMgmt) SubscribeAlert(s *Stock, c *Contact, per float32) (alert *Alert, err error) {
-	a, e := db.SubscribeAlert(s, c, per)
+func (sm *StocksMgmt) SubscribeAlert(s *Stock, c *Contact, per float32, direction int) (alert *Alert, err error) {
+	a, e := db.SubscribeAlert(s, c, per, direction)
 
 	sm.Lock()
 	if _, ok := sm.stocks[s.String()]; !ok {

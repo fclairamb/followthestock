@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/mattn/go-xmpp"
 	"log"
+	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -97,18 +98,34 @@ Available commands are:
 			return errors.New("Could not get contact !")
 		}
 
-		per, err := strconv.ParseFloat(tokens[2], 32)
+		value := tokens[2]
+		per, err := strconv.ParseFloat(value, 32)
 
 		if err != nil {
 			return err
 		}
 
-		alert, err := stocks.SubscribeAlert(stock, contact, float32(per))
+		per = math.Abs(per)
+		var direction int
+		var descDirection string
+		switch value[0] {
+		case '-':
+			direction = ALERT_DIRECTION_DOWN
+			descDirection = "-"
+		case '+':
+			direction = ALERT_DIRECTION_UP
+			descDirection = "+"
+		default:
+			direction = ALERT_DIRECTION_BOTH
+			descDirection = "~"
+		}
+
+		alert, err := stocks.SubscribeAlert(stock, contact, float32(per), direction)
 		if err != nil {
 			return err
 		}
 
-		x.Send <- &SendChat{Remote: v.Remote, Text: fmt.Sprintf("Subscribed to %v with %.2f%% variation on alert %d.", stock, per, alert.Id)}
+		x.Send <- &SendChat{Remote: v.Remote, Text: fmt.Sprintf("Subscribed to %v with %s%.2f%% variation on alert %d.", stock, descDirection, per, alert.Id)}
 
 	} else if cmd == "!u" {
 		if len(tokens) != 2 {

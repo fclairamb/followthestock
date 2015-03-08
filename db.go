@@ -19,7 +19,7 @@ type Parameter struct {
 type Stock struct {
 	// db tag lets you specify the column name if it differs from the struct field
 	Id            int64   `db:"stock_id"`
-	Market        string  `db:"market"` // "FR","US","US2",W"
+	Market        string  `db:"market"` // "FR","US","US2",W","AM"
 	Short         string  `db:"short"`
 	Name          string  `db:"name"`
 	Value         float32 `db:"value"` // Last value
@@ -57,13 +57,20 @@ type Value struct {
 }
 
 type Alert struct {
-	Id            int64   `db:"alert_id"`
-	Contact       int64   `db:"contact_id"`
-	Stock         int64   `db:"stock_id"`
-	LastTriggered int64   `db:"last_triggered"`
-	LastValue     float32 `db:"last_value"`
-	Percent       float32 `db:"percent"`
+	Id               int64   `db:"alert_id"`
+	Contact          int64   `db:"contact_id"`
+	Stock            int64   `db:"stock_id"`
+	LastTriggered    int64   `db:"last_triggered"`
+	LastValue        float32 `db:"last_value"`
+	Percent          float32 `db:"percent"`
+	PercentDirection int     `db:"percent_direction"`
 }
+
+const (
+	ALERT_DIRECTION_BOTH = iota
+	ALERT_DIRECTION_UP   = iota
+	ALERT_DIRECTION_DOWN = iota
+)
 
 type DatabaseUpgrade struct {
 	Version int
@@ -137,6 +144,12 @@ func (db *FtsDB) Upgrade() {
 			Version: 2,
 			Sql: []string{
 				`alter table ` + TABLE_CONTACT + ` add column "show_url" integer default 1`,
+			},
+		},
+		&DatabaseUpgrade{
+			Version: 3,
+			Sql: []string{
+				`alter table ` + TABLE_ALERT + ` add column "percent_direction" integer default 0`,
 			},
 		},
 	}
@@ -253,14 +266,14 @@ func (db *FtsDB) SaveStockValue(stock *Stock, value float32) error {
 	return nil
 }
 
-func (db *FtsDB) SubscribeAlert(s *Stock, c *Contact, per float32) (alert *Alert, err error) {
+func (db *FtsDB) SubscribeAlert(s *Stock, c *Contact, per float32, direction int) (alert *Alert, err error) {
 	_, err = db.UnsubscribeAlert(s, c)
 
 	if err != nil {
 		return nil, err
 	}
 
-	alert = &Alert{Stock: s.Id, Contact: c.Id, Percent: per}
+	alert = &Alert{Stock: s.Id, Contact: c.Id, Percent: per, PercentDirection: direction}
 
 	err = db.SaveAlert(alert)
 
