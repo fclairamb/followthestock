@@ -61,17 +61,20 @@ func (sf *StockFollower) run() {
 }
 
 func (sf *StockFollower) considerValue(value float32) {
+
+	now := time.Now().UTC().UnixNano()
+
 	if value == 0 {
 		log.Println("WARNING: We have to ignore zero value for stock %v.", sf.Stock)
 		return
 	}
 
-	db.SaveStockValue(sf.Stock, value)
+	db.SaveStockValue(sf.Stock, value, now)
 	for _, al := range *db.GetAlertsForStock(sf.Stock) {
 		if al.LastValue == 0 {
 			value = value * 0.5
 			al.LastValue = value
-			al.LastTriggered = time.Now().UTC().UnixNano()
+			al.LastTriggered = now
 			db.SaveAlert(&al)
 
 			contact := db.GetContactFromId(al.Contact)
@@ -112,9 +115,9 @@ func (sf *StockFollower) considerValue(value float32) {
 
 			log.Println("Alert", al.Id, "- Trigger !")
 			al.LastValue = value
-			timeDiff := time.Duration(time.Now().UTC().UnixNano() - al.LastTriggered)
+			timeDiff := time.Duration(now - al.LastTriggered)
 			timeDiff -= timeDiff % time.Second
-			al.LastTriggered = time.Now().UTC().UnixNano()
+			al.LastTriggered = now
 			message := fmt.Sprintf("%s : %.3f (%+.2f%%) in %v", sf.Stock.String(), value, per, timeDiff)
 
 			if contact.ShowUrl {

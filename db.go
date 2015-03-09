@@ -134,13 +134,13 @@ func NewFtsDB() *FtsDB {
 // Performs an automatic database upgrade
 func (db *FtsDB) Upgrade() {
 	upgrades := []*DatabaseUpgrade{
-		&DatabaseUpgrade{ // First upgrade: add a failed_fetches column
+		&DatabaseUpgrade{
 			Version: 1,
 			Sql: []string{
 				`alter table ` + TABLE_STOCK + ` add column "failed_fetches" integer default 0`,
 			},
 		},
-		&DatabaseUpgrade{ // First upgrade: add a failed_fetches column
+		&DatabaseUpgrade{
 			Version: 2,
 			Sql: []string{
 				`alter table ` + TABLE_CONTACT + ` add column "show_url" integer default 1`,
@@ -167,7 +167,7 @@ func (db *FtsDB) Upgrade() {
 			for _, sql := range up.Sql {
 				log.Printf(`Performing SQL upgrade... "%s"`, sql)
 				if _, err := db.connection.Exec(sql); err != nil {
-					log.Printf(`Failed to apply query "%s" and error: %s`, sql, err)
+					log.Printf(`Failed to apply query "%s" with error: %s`, sql, err)
 				} else {
 					log.Printf("OK !")
 				}
@@ -258,12 +258,19 @@ func (db *FtsDB) GetAllStocks() *[]Stock {
 	return &stocks
 }
 
-func (db *FtsDB) SaveStockValue(stock *Stock, value float32) error {
+func (db *FtsDB) SaveStockValue(stock *Stock, value float32, date int64) (err error) {
 	if stock.Value != value {
 		stock.Value = value
-		return db.SaveStock(stock)
+		err = db.SaveStock(stock)
+	} else {
+		err = nil
 	}
-	return nil
+
+	if err == nil {
+		err = db.mapping.Insert(&Value{Stock: stock.Id, Date: date, Value: value})
+	}
+
+	return err
 }
 
 func (db *FtsDB) SubscribeAlert(s *Stock, c *Contact, per float32, direction int) (alert *Alert, err error) {

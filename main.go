@@ -18,7 +18,7 @@ var config *Config
 
 var waitForRc chan int
 
-const FTS_VERSION = "0.2"
+const FTS_VERSION = "0.3"
 
 func init() {
 	waitForRc = make(chan int)

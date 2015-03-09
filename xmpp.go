@@ -51,7 +51,7 @@ func (x *FtsXmpp) handle_chat(v *xmpp.Chat) (err error) {
 Available commands are:
 
 !help                    - This command
-!s <stock> <per>         - Subscribe to variation about a stock
+!s <stock> <per>         - Subscribe to variation about a stock (Ex: !s rno 2)
 !u <stock>               - Unsubscribe from a stock
 !g <stock>               - Get data about a stock
 !ls                      - List currently monitored stocks
@@ -99,6 +99,10 @@ Available commands are:
 		}
 
 		value := tokens[2]
+
+		// We remove the "%" if there's one
+		value = strings.SplitN(value, "%", 2)[0]
+
 		per, err := strconv.ParseFloat(value, 32)
 
 		if err != nil {
@@ -339,11 +343,11 @@ Available commands are:
 	} else if cmd == "!version" {
 		x.Send <- &SendChat{Remote: v.Remote, Text: "version = " + FTS_VERSION}
 	} else {
-		if cmd == "What" {
-			log.Println("Potential loophole")
+		if cmd == "WHAT? " {
+			log.Printf("Potential loophole: %s", v.Text)
 			return nil
 		}
-		x.Send <- &SendChat{Remote: v.Remote, Text: fmt.Sprintf("What do you mean ? Type !help for help.")}
+		x.Send <- &SendChat{Remote: v.Remote, Text: fmt.Sprintf("WHAT? Type !help. You issued: %s", v.Text)}
 	}
 
 	return nil
