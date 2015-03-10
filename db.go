@@ -9,6 +9,7 @@ import (
 	"log"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type Parameter struct {
@@ -281,10 +282,9 @@ func (db *FtsDB) SaveStockValue(stock *Stock, value float32, date int64) (err er
 
 func (this *FtsDB) GetStockValue(stock *Stock, date int64) (*Value, error) {
 	value := &Value{}
-	err := db.mapping.SelectOne(value, "select * from "+TABLE_VALUE+" where stock_id=? and date>? order by date desc;", stock.Id, date)
+	err := db.mapping.SelectOne(value, "select * from "+TABLE_VALUE+" where stock_id=? and date>? order by date desc limit 1;", stock.Id, date)
 
 	if err != nil {
-		log.Printf("Issue requesting : select * from "+TABLE_VALUE+" where stock_id=%d and date>%d", stock.Id, date)
 		return nil, err
 	} else {
 		return value, nil
@@ -415,10 +415,31 @@ func (db *FtsDB) DeleteCurrencyConversion(c *CurrencyConversion) (err error) {
 	return
 }
 
-func (s *Stock) String() string {
-	return "\"" + s.Name + "\" (" + s.Market + ":" + s.Short + ")"
-}
-
 func (csv *ContactStockValue) Exists() bool {
 	return csv.Id != 0
+}
+
+func (s *Stock) String() string {
+	return fmt.Sprintf("\"%s\" (%s:%s)", s.Name, s.Market, s.Short)
+}
+
+func (this *Alert) String() string {
+	// NOTE: This performs a request on each String call
+	stock := db.GetStockFromId(this.Stock)
+	var direction string
+	switch this.PercentDirection {
+	case ALERT_DIRECTION_UP:
+		direction = "+"
+	case ALERT_DIRECTION_DOWN:
+		direction = "-"
+	default:
+		direction = "~"
+	}
+
+	str := fmt.Sprintf("%s %s%.2f%%", stock.String(), direction, this.Percent)
+	if this.Duration != 0 {
+		str += fmt.Sprintf(" on %s", time.Duration(this.Duration))
+	}
+	str += fmt.Sprintf(" [%d]", this.Id)
+	return str
 }

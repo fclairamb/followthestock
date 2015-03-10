@@ -111,17 +111,13 @@ Available commands are:
 
 		per = math.Abs(per)
 		var direction int
-		var descDirection string
 		switch value[0] {
 		case '-':
 			direction = ALERT_DIRECTION_DOWN
-			descDirection = "-"
 		case '+':
 			direction = ALERT_DIRECTION_UP
-			descDirection = "+"
 		default:
 			direction = ALERT_DIRECTION_BOTH
-			descDirection = "~"
 		}
 
 		duration := int64(0)
@@ -139,12 +135,7 @@ Available commands are:
 			return err
 		}
 
-		message := fmt.Sprintf("Subscribed to %v with a %s%.2f%% variation", stock, descDirection, per)
-		if alert.Duration != 0 {
-			message += fmt.Sprintf(" on a %s time-window", time.Duration(alert.Duration))
-		}
-		message += fmt.Sprintf(" (alert %d).", alert.Id)
-
+		message := fmt.Sprintf("Defined alert %s", alert.String())
 		x.Send <- &SendChat{Remote: v.Remote, Text: message}
 
 	} else if cmd == "!u" {
@@ -191,7 +182,7 @@ Available commands are:
 				db.DeleteAlert(&al)
 				continue
 			}
-			msg += fmt.Sprintf("\n%s - %.2f%% [%d]", s.String(), al.Percent, al.Id)
+			msg += fmt.Sprintf("\n%s", al.String())
 
 			if i%config.Xmpp.LinesPerMessage == 0 {
 				x.Send <- &SendChat{Remote: v.Remote, Text: msg}
@@ -461,10 +452,10 @@ func (x *FtsXmpp) runCheck() {
 }
 
 func (x *FtsXmpp) Start() {
-	go x.runMain()
-	go x.runRecv()
-	go x.runSend()
-	go x.runCheck()
+	go x.runMain()  // Handles connection and fetches incoming messages
+	go x.runRecv()  // Handles incoming messages
+	go x.runSend()  // Sends messages
+	go x.runCheck() // Check if the program behaves correctly
 }
 
 func (x *FtsXmpp) Stop() {

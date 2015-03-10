@@ -89,7 +89,7 @@ func (sf *StockFollower) considerValue(value float32) {
 		diff := value - al.LastValue
 		per := diff / al.LastValue * 100
 		varPer := float32(math.Abs(float64(per)))
-		log.Println("Alert", al.Id, "-", sf.Stock, ":", varPer, "%")
+		log.Printf("Alert %s", al.String())
 
 		var triggered bool
 		switch al.PercentDirection {
@@ -145,7 +145,7 @@ func (sf *StockFollower) considerValue(value float32) {
 					al.LastDate = startOfTimeWindow
 					al.LastValue = value.Value
 					db.SaveAlert(&al)
-					log.Printf("Alert %d: lastDate = %v, lastValue = %v", al.Id, time.Unix(0, al.LastDate), al.LastValue)
+					log.Printf("Alert %s: lastDate = %v, lastValue = %v", al.String(), time.Unix(0, al.LastDate), al.LastValue)
 				} else {
 					log.Printf("Cannot find rows for alert %v: %v", sf.Stock, err)
 				}
@@ -252,6 +252,8 @@ func (s *Stock) boursoramaSymbol() (symbol string) {
 		symbol = "1rA" + s.Short
 	case "W": // Warrants
 		symbol = "2rP" + s.Short
+	case "W2":
+		symbol = "3rP" + s.Short
 	case "BE": // EURONEXT Bruxelles
 		symbol = "FF11-" + s.Short
 	default:
