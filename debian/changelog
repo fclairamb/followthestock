@@ -1,3 +1,11 @@
+followthestock (0.4-1) unstable; urgency=low
+
+  * Removing the "!" before each command
+  * Ignoring uppercase (for easier mobile phone control)
+  * XMPP handling code cleanup
+
+ -- Florent Clairambault <florent@xps>  Tue, 10 Mar 2015 21:23:34 +0100
+
 followthestock (0.4) unstable; urgency=low
 
   * Added support for plus/minus percentage change ("!s rno -1%")

@@ -39,322 +39,362 @@ func (x *FtsXmpp) handle_chat(v *xmpp.Chat) (err error) {
 		return nil
 	}
 
-	v.Text = strings.TrimSpace(v.Text)
+	v.Text = strings.ToLower(strings.TrimSpace(v.Text))
 
 	tokens := strings.SplitN(v.Text, " ", -1)
 	cmd := tokens[0]
 
-	if cmd == "!ping" {
-		x.Send <- &SendChat{Remote: v.Remote, Text: "!pong " + v.Text[len("!ping"):]}
-	} else if cmd == "!help" {
-		x.Send <- &SendChat{Remote: v.Remote, Text: `
+	// We now ignore the "!" prefix
+	if cmd[0] == '!' {
+		cmd = cmd[1:]
+	}
+
+	switch cmd {
+	case "ping":
+		{
+			x.Send <- &SendChat{Remote: v.Remote, Text: "!pong " + v.Text[len("!ping"):]}
+		}
+	case "help":
+		{
+			x.Send <- &SendChat{Remote: v.Remote, Text: `
 Available commands are:
 
-!help                    - This command
-!s <stock> <per>         - Subscribe to variation about a stock (Ex: !s rno 2)
-!u <stock>               - Unsubscribe from a stock
-!g <stock>               - Get data about a stock
-!ls                      - List currently monitored stocks
-!v                       - Get the value of our stocks
-!v <stock>               - Get the value of a particular stock
-!v <stock> <nb> (<cost>) - Register the number of shares and the cost of a particular stock
-!pause <days>            - Pause alerts for X days
-!resume                  - Resume alerts
-!uptime                  - Application uptime
-!url                     - Show an URL with alerts
-!nourl                   - Do not show an URL with alerts
-!ping <data>             - Ping test
+help                              - This command
+s <stock> (+|-)<per> (<duration>) - Subscribe to variation about a stock (Ex: !s rno 2)
+u <stock>                         - Unsubscribe from a stock
+g <stock>                         - Get data about a stock
+ls                                - List currently monitored stocks
+v                                 - Get the value of our stocks
+v <stock>                         - Get the value of a particular stock
+v <stock> <nb> (<cost>)           - Register the number of shares and the cost of a particular stock
+pause <days>                      - Pause alerts for X days
+resume                            - Resume alerts
+uptime                            - Application uptime
+url                               - Show an URL with alerts
+nourl                             - Do not show an URL with alerts
+ping <data>                       - Ping test
 `}
-	} else if cmd == "!me" {
-		contact := db.GetContactFromEmail(v.Remote)
-		x.Send <- &SendChat{Remote: v.Remote, Text: fmt.Sprintf("You are contact %d (%s)", contact.Id, contact.Email)}
-	} else if cmd == "!g" {
-		if len(tokens) != 2 {
-			return errors.New("No stock provided !")
 		}
-		short := tokens[1]
-		stock, err := stocks.GetStock(short)
-		if err == nil {
-			value, _, _ := stock.GetValue()
-			x.Send <- &SendChat{Remote: v.Remote, Text: fmt.Sprintf("Stock %s : %.3f %s", stock, value, stock.Currency)}
-		} else {
-			x.Send <- &SendChat{Remote: v.Remote, Text: fmt.Sprintf("Could not find stock \"%s\".", short)}
+	case "me":
+		{
+			contact := db.GetContactFromEmail(v.Remote)
+			x.Send <- &SendChat{Remote: v.Remote, Text: fmt.Sprintf("You are contact %d (%s)", contact.Id, contact.Email)}
 		}
-	} else if cmd == "!s" {
-		if len(tokens) < 3 {
-			return errors.New("You must specify stock and percentage !")
-		}
-		short := tokens[1]
-
-		stock, err := stocks.GetStock(short)
-
-		if err != nil {
-			return errors.New(fmt.Sprintf("Could not find the stock \"%s\".", short))
-		}
-
-		contact := db.GetContactFromEmail(v.Remote)
-
-		if contact == nil {
-			return errors.New("Could not get contact !")
-		}
-
-		value := tokens[2]
-
-		// We remove the "%" if there's one
-		value = strings.SplitN(value, "%", 2)[0]
-
-		per, err := strconv.ParseFloat(value, 32)
-
-		if err != nil {
-			return err
-		}
-
-		per = math.Abs(per)
-		var direction int
-		switch value[0] {
-		case '-':
-			direction = ALERT_DIRECTION_DOWN
-		case '+':
-			direction = ALERT_DIRECTION_UP
-		default:
-			direction = ALERT_DIRECTION_BOTH
-		}
-
-		duration := int64(0)
-
-		if len(tokens) >= 4 { // For duration
-			if d, err := time.ParseDuration(tokens[3]); err == nil {
-				duration = int64(d)
+	case "g":
+		{
+			if len(tokens) != 2 {
+				return errors.New("No stock provided !")
+			}
+			short := tokens[1]
+			stock, err := stocks.GetStock(short)
+			if err == nil {
+				value, _, _ := stock.GetValue()
+				x.Send <- &SendChat{Remote: v.Remote, Text: fmt.Sprintf("Stock %s : %.3f %s", stock, value, stock.Currency)}
 			} else {
-				return err
+				x.Send <- &SendChat{Remote: v.Remote, Text: fmt.Sprintf("Could not find stock \"%s\".", short)}
 			}
 		}
-
-		alert, err := stocks.SubscribeAlert(stock, contact, float32(per), direction, duration)
-		if err != nil {
-			return err
-		}
-
-		message := fmt.Sprintf("Defined alert %s", alert.String())
-		x.Send <- &SendChat{Remote: v.Remote, Text: message}
-
-	} else if cmd == "!u" {
-		if len(tokens) != 2 {
-			return errors.New("No stock provided !")
-		}
-
-		short := tokens[1]
-
-		stock, err := stocks.GetStock(short)
-
-		if err != nil {
-			return err
-		}
-
-		contact := db.GetContactFromEmail(v.Remote)
-
-		if contact == nil {
-			return errors.New("Could not get contact !")
-		}
-
-		err = stocks.UnsubscribeAlert(stock, contact)
-
-		if err != nil {
-			return err
-		}
-
-		x.Send <- &SendChat{Remote: v.Remote, Text: fmt.Sprintf("Done !")}
-
-	} else if cmd == "!ls" {
-		c := db.GetContactFromEmail(v.Remote)
-
-		if c == nil {
-			return errors.New("Could not get contact !")
-		}
-		i := 0
-		msg := ""
-		//log.Println("Contact", c)
-		for _, al := range *db.GetAlertsForContact(c) {
-			//log.Println(al)
-			i++
-			s := db.GetStockFromId(al.Stock)
-			if s == nil {
-				db.DeleteAlert(&al)
-				continue
+	case "s":
+		{
+			if len(tokens) < 3 {
+				return errors.New("You must specify stock and percentage !")
 			}
-			msg += fmt.Sprintf("\n%s", al.String())
+			short := tokens[1]
 
-			if i%config.Xmpp.LinesPerMessage == 0 {
-				x.Send <- &SendChat{Remote: v.Remote, Text: msg}
-				msg = ""
+			stock, err := stocks.GetStock(short)
+
+			if err != nil {
+				return errors.New(fmt.Sprintf("Could not find the stock \"%s\".", short))
 			}
-		}
-		if i == 0 {
-			x.Send <- &SendChat{Remote: v.Remote, Text: "You didn't subscribe to anything !"}
-		}
-		if msg != "" {
-			x.Send <- &SendChat{Remote: v.Remote, Text: msg}
-		}
-	} else if cmd == "!v" {
 
-		// We get the contact
-		contact := db.GetContactFromEmail(v.Remote)
-		if contact == nil {
-			return errors.New("Could not get contact !")
-		}
+			contact := db.GetContactFromEmail(v.Remote)
 
-		if len(tokens) > 1 {
-			// We get the stock
-			stock, err := stocks.GetStock(tokens[1])
+			if contact == nil {
+				return errors.New("Could not get contact !")
+			}
+
+			value := tokens[2]
+
+			// We remove the "%" if there's one
+			value = strings.SplitN(value, "%", 2)[0]
+
+			per, err := strconv.ParseFloat(value, 32)
+
 			if err != nil {
 				return err
 			}
 
-			save := false
+			per = math.Abs(per)
+			var direction int
+			switch value[0] {
+			case '-':
+				direction = ALERT_DIRECTION_DOWN
+			case '+':
+				direction = ALERT_DIRECTION_UP
+			default:
+				direction = ALERT_DIRECTION_BOTH
+			}
 
-			csv := db.GetContactStockValue(contact.Id, stock.Id)
+			duration := int64(0)
 
-			if len(tokens) >= 3 {
-				v, err := strconv.ParseInt(tokens[2], 10, 32)
-				if err != nil {
-					return err
-				}
-				csv.Nb = int32(v)
-				if csv.Nb > 0 {
-					save = true
+			if len(tokens) >= 4 { // For duration
+				if d, err := time.ParseDuration(tokens[3]); err == nil {
+					duration = int64(d)
 				} else {
-					db.DeleteContactStockValue(csv)
-				}
-			}
-
-			if len(tokens) >= 4 {
-				v, err := strconv.ParseFloat(tokens[3], 32)
-				if err != nil {
 					return err
 				}
-				csv.Value = float32(v)
 			}
 
-			if save {
-				if err := db.SaveContactStockValue(csv); err != nil {
-					return err
-				}
-
-				x.Send <- &SendChat{Remote: v.Remote, Text: fmt.Sprintf("Saved %s with %d x %.02f = %.02f %s [%d]", stock, csv.Nb, csv.Value, (float32(csv.Nb) * csv.Value), stock.Currency, csv.Id)}
+			alert, err := stocks.SubscribeAlert(stock, contact, float32(per), direction, duration)
+			if err != nil {
+				return err
 			}
+
+			message := fmt.Sprintf("Defined alert %s", alert.String())
+			x.Send <- &SendChat{Remote: v.Remote, Text: message}
+
 		}
+	case "u":
+		{
+			if len(tokens) != 2 {
+				return errors.New("No stock provided !")
+			}
 
-		{ // We send the the message
+			short := tokens[1]
+
+			stock, err := stocks.GetStock(short)
+
+			if err != nil {
+				return err
+			}
+
+			contact := db.GetContactFromEmail(v.Remote)
+
+			if contact == nil {
+				return errors.New("Could not get contact !")
+			}
+
+			err = stocks.UnsubscribeAlert(stock, contact)
+
+			if err != nil {
+				return err
+			}
+
+			x.Send <- &SendChat{Remote: v.Remote, Text: fmt.Sprintf("Done !")}
+
+		}
+	case "l":
+	case "ls":
+		{
+			c := db.GetContactFromEmail(v.Remote)
+
+			if c == nil {
+				return errors.New("Could not get contact !")
+			}
 			i := 0
 			msg := ""
-			totalCost := float32(0)
-			totalValue := float32(0)
-			for _, csv := range *db.GetContactStockValuesFromContact(contact) {
-				s := db.GetStockFromId(csv.Stock)
+			//log.Println("Contact", c)
+			for _, al := range *db.GetAlertsForContact(c) {
+				//log.Println(al)
+				i++
+				s := db.GetStockFromId(al.Stock)
 				if s == nil {
-					db.DeleteContactStockValue(&csv)
+					db.DeleteAlert(&al)
 					continue
 				}
-
-				i++
-
-				cost := float32(csv.Nb) * csv.Value
-				value := float32(csv.Nb) * s.Value
-
-				totalCost += cost
-				totalValue += value
-
-				diff := value - cost
-				per := diff * 100 / cost
-
-				msg += fmt.Sprintf(
-					"\n%s, %d shares, value: %.03f / %.03f, total: %.03f - %.03f = %+.03f %s (%+.02f%%)",
-					s.String(), csv.Nb, s.Value, csv.Value, value, cost, diff, s.Currency, per)
+				msg += fmt.Sprintf("\n%s", al.String())
 
 				if i%config.Xmpp.LinesPerMessage == 0 {
 					x.Send <- &SendChat{Remote: v.Remote, Text: msg}
 					msg = ""
 				}
-
 			}
 			if i == 0 {
-				x.Send <- &SendChat{Remote: v.Remote, Text: "You didn't register any stock value."}
-			} else {
-				totalDiff := totalValue - totalCost
-				per := totalDiff * 100 / totalCost
-				msg += fmt.Sprintf("\nTotal: %.03f - %.03f = %+.03f %s (%+.02f%%)", totalValue, totalCost, totalDiff, "EUR", per)
+				x.Send <- &SendChat{Remote: v.Remote, Text: "You didn't subscribe to anything !"}
 			}
-			x.Send <- &SendChat{Remote: v.Remote, Text: msg}
+			if msg != "" {
+				x.Send <- &SendChat{Remote: v.Remote, Text: msg}
+			}
 		}
+	case "v":
+		{
 
-	} else if cmd == "!pause" {
-		if len(tokens) != 2 {
-			return errors.New("You have to specify a number of days !")
+			// We get the contact
+			contact := db.GetContactFromEmail(v.Remote)
+			if contact == nil {
+				return errors.New("Could not get contact !")
+			}
+
+			if len(tokens) > 1 {
+				// We get the stock
+				stock, err := stocks.GetStock(tokens[1])
+				if err != nil {
+					return err
+				}
+
+				save := false
+
+				csv := db.GetContactStockValue(contact.Id, stock.Id)
+
+				if len(tokens) >= 3 {
+					v, err := strconv.ParseInt(tokens[2], 10, 32)
+					if err != nil {
+						return err
+					}
+					csv.Nb = int32(v)
+					if csv.Nb > 0 {
+						save = true
+					} else {
+						db.DeleteContactStockValue(csv)
+					}
+				}
+
+				if len(tokens) >= 4 {
+					v, err := strconv.ParseFloat(tokens[3], 32)
+					if err != nil {
+						return err
+					}
+					csv.Value = float32(v)
+				}
+
+				if save {
+					if err := db.SaveContactStockValue(csv); err != nil {
+						return err
+					}
+
+					x.Send <- &SendChat{Remote: v.Remote, Text: fmt.Sprintf("Saved %s with %d x %.02f = %.02f %s [%d]", stock, csv.Nb, csv.Value, (float32(csv.Nb) * csv.Value), stock.Currency, csv.Id)}
+				}
+			}
+
+			{ // We send the the message
+				i := 0
+				msg := ""
+				totalCost := float32(0)
+				totalValue := float32(0)
+				for _, csv := range *db.GetContactStockValuesFromContact(contact) {
+					s := db.GetStockFromId(csv.Stock)
+					if s == nil {
+						db.DeleteContactStockValue(&csv)
+						continue
+					}
+
+					i++
+
+					cost := float32(csv.Nb) * csv.Value
+					value := float32(csv.Nb) * s.Value
+
+					totalCost += cost
+					totalValue += value
+
+					diff := value - cost
+					per := diff * 100 / cost
+
+					msg += fmt.Sprintf(
+						"\n%s, %d shares, value: %.03f / %.03f, total: %.03f - %.03f = %+.03f %s (%+.02f%%)",
+						s.String(), csv.Nb, s.Value, csv.Value, value, cost, diff, s.Currency, per)
+
+					if i%config.Xmpp.LinesPerMessage == 0 {
+						x.Send <- &SendChat{Remote: v.Remote, Text: msg}
+						msg = ""
+					}
+
+				}
+				if i == 0 {
+					x.Send <- &SendChat{Remote: v.Remote, Text: "You didn't register any stock value."}
+				} else {
+					totalDiff := totalValue - totalCost
+					per := totalDiff * 100 / totalCost
+					msg += fmt.Sprintf("\nTotal: %.03f - %.03f = %+.03f %s (%+.02f%%)", totalValue, totalCost, totalDiff, "EUR", per)
+				}
+				x.Send <- &SendChat{Remote: v.Remote, Text: msg}
+			}
+
 		}
-		contact := db.GetContactFromEmail(v.Remote)
+	case "pause":
+		{
+			if len(tokens) != 2 {
+				return errors.New("You have to specify a number of days !")
+			}
+			contact := db.GetContactFromEmail(v.Remote)
 
-		if contact == nil {
-			return errors.New("Could not get contact !")
+			if contact == nil {
+				return errors.New("Could not get contact !")
+			}
+
+			var nb int64
+			nb, err = strconv.ParseInt(tokens[1], 10, 64)
+
+			if err != nil {
+				return err
+			}
+
+			contact.PauseUntil = time.Now().UTC().UnixNano() + time.Hour.Nanoseconds()*24*nb
+
+			db.SaveContact(contact)
+
+			x.Send <- &SendChat{Remote: v.Remote, Text: fmt.Sprintf("OK, no alert for %d days.", nb)}
 		}
+	case "resume":
+		{
+			contact := db.GetContactFromEmail(v.Remote)
 
-		var nb int64
-		nb, err = strconv.ParseInt(tokens[1], 10, 64)
+			if contact == nil {
+				return errors.New("Could not get contact !")
+			}
 
-		if err != nil {
-			return err
+			contact.PauseUntil = 0
+
+			db.SaveContact(contact)
+			x.Send <- &SendChat{Remote: v.Remote, Text: "OK, back to work !"}
 		}
+	case "url":
+	case "nourl":
+		{
+			contact := db.GetContactFromEmail(v.Remote)
+			if contact == nil {
+				return errors.New("Could not get contact !")
+			}
 
-		contact.PauseUntil = time.Now().UTC().UnixNano() + time.Hour.Nanoseconds()*24*nb
-
-		db.SaveContact(contact)
-
-		x.Send <- &SendChat{Remote: v.Remote, Text: fmt.Sprintf("OK, no alert for %d days.", nb)}
-	} else if cmd == "!resume" {
-		contact := db.GetContactFromEmail(v.Remote)
-
-		if contact == nil {
-			return errors.New("Could not get contact !")
+			contact.ShowUrl = (cmd == "!url")
+			db.SaveContact(contact)
+			x.Send <- &SendChat{Remote: v.Remote, Text: fmt.Sprintf("OK (ShowUrl=%v)", contact.ShowUrl)}
 		}
+	case "forgetme":
+		{
+			contact := db.GetContactFromEmail(v.Remote)
 
-		contact.PauseUntil = 0
+			if contact == nil {
+				return errors.New("Could not get contact !")
+			}
 
-		db.SaveContact(contact)
-		x.Send <- &SendChat{Remote: v.Remote, Text: "OK, back to work !"}
-	} else if cmd == "!url" || cmd == "!nourl" {
-		contact := db.GetContactFromEmail(v.Remote)
-		if contact == nil {
-			return errors.New("Could not get contact !")
+			x.Send <- &SendChat{Remote: v.Remote, Text: "Who are you ?"}
+
+			db.DeleteContact(contact)
 		}
-
-		contact.ShowUrl = (cmd == "!url")
-		db.SaveContact(contact)
-		x.Send <- &SendChat{Remote: v.Remote, Text: fmt.Sprintf("OK (ShowUrl=%v)", contact.ShowUrl)}
-	} else if cmd == "!forgetme" {
-		contact := db.GetContactFromEmail(v.Remote)
-
-		if contact == nil {
-			return errors.New("Could not get contact !")
+	case "uptime":
+		{
+			diff := time.Now().UTC().Sub(x.StartTime)
+			diff -= diff % time.Second
+			x.Send <- &SendChat{Remote: v.Remote, Text: fmt.Sprintf("Uptime: %s", diff)}
 		}
-
-		x.Send <- &SendChat{Remote: v.Remote, Text: "Who are you ?"}
-
-		db.DeleteContact(contact)
-	} else if cmd == "!uptime" {
-		diff := time.Now().UTC().Sub(x.StartTime)
-		diff -= diff % time.Second
-		x.Send <- &SendChat{Remote: v.Remote, Text: fmt.Sprintf("Uptime: %s", diff)}
-	} else if cmd == "!quit" {
-		x.Send <- &SendChat{Remote: v.Remote, Text: "Bye bye!"}
-		time.Sleep(time.Second * 5)
-		waitForRc <- 1
-	} else if cmd == "!version" {
-		x.Send <- &SendChat{Remote: v.Remote, Text: "version = " + FTS_VERSION}
-	} else {
-		if cmd == "WHAT? " {
-			log.Printf("Potential loophole: %s", v.Text)
-			return nil
+	case "quit":
+		{
+			x.Send <- &SendChat{Remote: v.Remote, Text: "Bye bye!"}
+			time.Sleep(time.Second * 5)
+			waitForRc <- 1
 		}
-		x.Send <- &SendChat{Remote: v.Remote, Text: fmt.Sprintf("WHAT? Type !help. You issued: %s", v.Text)}
+	case "version":
+		{
+			x.Send <- &SendChat{Remote: v.Remote, Text: "version = " + FTS_VERSION}
+		}
+	default:
+		{
+			if cmd == "WHAT? " {
+				log.Printf("Potential loophole: %s", v.Text)
+				return nil
+			}
+			x.Send <- &SendChat{Remote: v.Remote, Text: fmt.Sprintf("WHAT? Type \"help\". You issued \"%s\".", v.Text)}
+		}
 	}
 
 	return nil
