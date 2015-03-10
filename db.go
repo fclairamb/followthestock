@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"github.com/coopernurse/gorp"
 	_ "github.com/mattn/go-sqlite3"
-	"log"
 	"strconv"
 	"strings"
 	"time"
@@ -172,11 +171,11 @@ func (db *FtsDB) Upgrade() {
 		if version < up.Version {
 			version = up.Version
 			for _, sql := range up.Sql {
-				log.Printf(`Performing SQL upgrade... "%s"`, sql)
+				log.Warning(`Performing SQL upgrade... "%s"`, sql)
 				if _, err := db.connection.Exec(sql); err != nil {
-					log.Printf(`Failed to apply query "%s" with error: %s`, sql, err)
+					log.Error(`Failed to apply query "%s" with error: %s`, sql, err)
 				} else {
-					log.Printf("OK !")
+					log.Info("OK !")
 				}
 			}
 			// We want to save the version as soon as possible.
@@ -187,7 +186,7 @@ func (db *FtsDB) Upgrade() {
 
 func (db FtsDB) Close() {
 	if err := db.connection.Close(); err != nil {
-		log.Printf("connection.Close(): %v", err)
+		log.Info("connection.Close(): %v", err)
 	}
 }
 
@@ -198,11 +197,11 @@ func (db *FtsDB) GetContactFromEmail(email string) *Contact {
 	c := &Contact{}
 	err := db.mapping.SelectOne(c, "select * from "+TABLE_CONTACT+" where email=?", email)
 	if err != nil {
-		log.Println("Creating contact ", email)
+		log.Warning("Creating contact ", email)
 		c.Email = email
 		err := db.mapping.Insert(c)
 		if err != nil {
-			log.Println("Could not insert:", err)
+			log.Error("Could not insert:", err)
 		}
 	}
 

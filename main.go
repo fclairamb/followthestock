@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"fmt"
 	//"github.com/beevik/etree"
-	"log"
 	"os"
 
 	"strings"
@@ -69,7 +68,7 @@ func core() (rc int) {
 	// We wait for someone to trigger the result code
 	rc = <-waitForRc
 
-	log.Println("Stopping !")
+	log.Info("Stopping !")
 
 	db.Close()
 
@@ -78,14 +77,14 @@ func core() (rc int) {
 
 func main() {
 
-	log.Println("Starting !")
+	log.Info("Starting !")
 
 	// We parse the parameters
 	config = NewConfig()
 
 	rc := core()
 
-	log.Println("Bye !")
+	log.Info("Bye !")
 
 	os.Exit(rc)
 }

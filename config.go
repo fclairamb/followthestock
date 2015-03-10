@@ -4,7 +4,6 @@ import (
 	"code.google.com/p/gcfg"
 	"flag"
 	"fmt"
-	"log"
 	"os"
 )
 
@@ -55,7 +54,7 @@ func NewConfig() *Config {
 	}
 
 	if showConfig {
-		log.Printf("Config: %#v", config)
+		log.Info("Config: %#v", config)
 	}
 
 	return config

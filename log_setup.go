@@ -1,9 +1,12 @@
 package main
 
 import (
-	"log"
+	m2log "github.com/fclairamb/m2mp/go/m2mp-log"
+	logging "github.com/op/go-logging"
 )
 
+var log *logging.Logger
+
 func init() {
-	log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds | log.Lshortfile)
+	log = m2log.GetLogger()
 }

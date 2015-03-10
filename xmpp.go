@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/mattn/go-xmpp"
-	"log"
 	"math"
 	"strconv"
 	"strings"
@@ -403,7 +402,7 @@ ping <data> - Ping test
 	default:
 		{
 			if cmd == "what? " {
-				log.Printf("Potential loophole: %s", v.Text)
+				log.Debug("Potential loophole: %s", v.Text)
 				return nil
 			}
 			x.Send <- &SendChat{Remote: v.Remote, Text: fmt.Sprintf("WHAT? Type \"help\". You issued \"%s\".", v.Text)}
@@ -420,14 +419,14 @@ func (x *FtsXmpp) runRecv() {
 		switch v := msg.(type) {
 		case xmpp.Chat:
 			if v.Text != "" {
-				log.Printf("[CHAT] %s --> \"%s\"", v.Remote, v.Text)
+				log.Debug("[CHAT] %s --> \"%s\"", v.Remote, v.Text)
 			}
 			err := x.handle_chat(&v)
 			if err != nil {
 				x.Send <- &SendChat{Remote: v.Remote, Text: fmt.Sprint("Error:", err)}
 			}
 		default:
-			log.Printf("[XMPP] Received: %v", msg)
+			log.Debug("[XMPP] Received: %v", msg)
 		}
 	}
 }
@@ -438,9 +437,9 @@ func (x *FtsXmpp) runSend() {
 		//log.Println("Send:", msg)
 		switch v := msg.(type) {
 		case *SendChat:
-			log.Printf("[CHAT] %s <-- \"%s\"", v.Remote, v.Text)
+			log.Debug("[CHAT] %s <-- \"%s\"", v.Remote, v.Text)
 			for x.clt == nil {
-				log.Printf("Cannot send on a nil XMPP !")
+				log.Error("Cannot send on a nil XMPP !")
 				time.Sleep(5)
 			}
 			x.clt.Send(xmpp.Chat{Type: "chat", Remote: v.Remote, Text: v.Text})
@@ -453,7 +452,7 @@ func (x *FtsXmpp) runMain() {
 		sleep := time.Second * 5
 		for { // We try to connect in loops, but the time between connections grows with failures
 			var err error
-			log.Println("Connecting...")
+			log.Debug("Connecting...")
 
 			xmpp.DefaultConfig.InsecureSkipVerify = true
 
@@ -464,15 +463,15 @@ func (x *FtsXmpp) runMain() {
 			}
 
 			if err != nil {
-				log.Println("Err:", err)
-				log.Printf("Sleeping %d seconds...", sleep/time.Second)
+				log.Error("Err:", err)
+				log.Debug("Sleeping %d seconds...", sleep/time.Second)
 				time.Sleep(sleep)
 				sleep += time.Second
 				if sleep > time.Second*120 {
 					sleep = time.Second * 5
 				}
 			} else {
-				log.Println("Connected !")
+				log.Info("Connected !")
 				sleep = time.Second * 2
 				break
 			}
@@ -481,7 +480,7 @@ func (x *FtsXmpp) runMain() {
 		for {
 			msg, err := x.clt.Recv()
 			if err != nil {
-				log.Println(err)
+				log.Error("Receiver issue: %v", err)
 				break
 			}
 			x.Recv <- msg
@@ -495,10 +494,10 @@ func (x *FtsXmpp) runCheck() {
 	for {
 		<-x.checkTicker.C
 		elapsed := time.Now().UTC().Sub(x.lastRcvdData)
-		log.Printf("Last received data: %v / %v", x.lastRcvdData, elapsed)
+		log.Debug("Last received data: %v / %v", x.lastRcvdData, elapsed)
 		if elapsed > time.Minute*time.Duration(config.Xmpp.ActivityWatchdogMinutes) {
-			message := fmt.Sprintf("WARNING: We haven't received anything for %v. We're quitting, hoping to be restarted !", elapsed)
-			log.Printf(message)
+			message := fmt.Sprintf("We haven't received anything for %v. We're quitting, hoping to be restarted !", elapsed)
+			log.Error(message)
 			panic(message)
 		}
 	}

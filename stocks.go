@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"math"
 	"net/http"
 	"os"
@@ -45,9 +44,9 @@ func (sf *StockFollower) run() {
 	for {
 		v, _, err := sf.Stock.GetValue()
 		if err != nil {
-			log.Println("Stock", sf.Stock, "error", err)
+			log.Warning("Stock %s: %v", sf.Stock.String(), err)
 		} else {
-			log.Println("Stock", sf.Stock, "=", v, sf.Stock.Currency)
+			log.Info("Stock %s = %f %s", sf.Stock, v, sf.Stock.Currency)
 			sf.considerValue(v)
 		}
 		if config.General.ExactTiming {
@@ -65,7 +64,7 @@ func (sf *StockFollower) considerValue(value float32) {
 	now := time.Now().UTC().UnixNano()
 
 	if value == 0 {
-		log.Println("WARNING: We have to ignore zero value for stock %v.", sf.Stock)
+		log.Warning("We have to ignore zero value for stock %v.", sf.Stock)
 		return
 	}
 
@@ -79,7 +78,7 @@ func (sf *StockFollower) considerValue(value float32) {
 
 			contact := db.GetContactFromId(al.Contact)
 			if contact == nil {
-				log.Println("Alert", al.Id, "- Contact missing, deleting alert !")
+				log.Info("Alert %d - Contact missing, deleting alert !", al.Id)
 				db.DeleteAlert(&al)
 			}
 
@@ -89,7 +88,7 @@ func (sf *StockFollower) considerValue(value float32) {
 		diff := value - al.LastValue
 		per := diff / al.LastValue * 100
 		varPer := float32(math.Abs(float64(per)))
-		log.Printf("Alert %s", al.String())
+		log.Info("Alert %s", al.String())
 
 		var triggered bool
 		switch al.PercentDirection {
@@ -104,16 +103,16 @@ func (sf *StockFollower) considerValue(value float32) {
 		if triggered {
 			contact := db.GetContactFromId(al.Contact)
 			if contact == nil {
-				log.Println("Alert", al.Id, "- Contact missing, deleting alert !")
+				log.Info("Alert %d - Contact missing, deleting alert !", al.Id)
 				db.DeleteAlert(&al)
 				continue
 			}
 			if now < contact.PauseUntil {
-				log.Println("Alert", al.Id, "- Contact is in pause")
+				log.Info("Alert %d - Contact is in pause", al.Id)
 				continue
 			}
 
-			log.Println("Alert", al.Id, "- Trigger !")
+			log.Info("Alert %d - Trigger !", al.Id)
 			al.LastValue = value
 			timeDiff := time.Duration(now - al.LastTriggered)
 			timeDiff -= timeDiff % time.Second
@@ -145,9 +144,9 @@ func (sf *StockFollower) considerValue(value float32) {
 					al.LastDate = startOfTimeWindow
 					al.LastValue = value.Value
 					db.SaveAlert(&al)
-					log.Printf("Alert %s: lastDate = %v, lastValue = %v", al.String(), time.Unix(0, al.LastDate), al.LastValue)
+					log.Info("Alert %s: lastDate = %v, lastValue = %v", al.String(), time.Unix(0, al.LastDate), al.LastValue)
 				} else {
-					log.Printf("Cannot find rows for alert %v: %v", sf.Stock, err)
+					log.Error("Cannot find rows for alert %v: %v", sf.Stock, err)
 				}
 			}
 		}
@@ -172,7 +171,7 @@ type StocksMgmt struct {
 }
 
 func httpGet(url string) (*http.Response, error) {
-	log.Println("Fetching", url, "...")
+	log.Debug("Fetching \"%s\"...", url)
 	r, e := http.Get(url)
 	//log.Println("Fetched ", url)
 	return r, e
@@ -206,7 +205,7 @@ func (this *Stock) PageContent() (body string, err error) {
 }
 
 func tryNewStock(market, short string) (*Stock, error) {
-	log.Printf("tryNewStock( \"%s\", \"%s\" );", market, short)
+	log.Debug("tryNewStock( \"%s\", \"%s\" );", market, short)
 	s := &Stock{Market: market, Short: short}
 
 	body, err := s.PageContent()
@@ -221,7 +220,7 @@ func tryNewStock(market, short string) (*Stock, error) {
 			s.Name = strings.Trim(result[1], " \n\r")
 			break
 		} else {
-			log.Printf("Regex failed: %s", re)
+			log.Error("Regex failed: %s", re)
 		}
 	}
 
@@ -230,7 +229,7 @@ func tryNewStock(market, short string) (*Stock, error) {
 		os.MkdirAll(TEMPDIR, 0755)
 		fileName := fmt.Sprintf("%s/%s_%s.html", TEMPDIR, s.Market, s.Short)
 		if err := ioutil.WriteFile(fileName, []byte(body), 0644); err != nil {
-			log.Printf("Could not write %s: %s", fileName, err)
+			log.Error("Could not write %s: %s", fileName, err)
 		}
 		return s, errors.New("Could not get the name")
 	}
@@ -304,19 +303,19 @@ func (s *Stock) GetValue() (value float32, currency string, err error) {
 		currency = result[2]
 		if s.FailedFetches != 0 {
 			s.FailedFetches = 0
-			log.Printf("Updating %v's failed fetches", s)
+			log.Debug("Updating %v's failed fetches", s)
 			save = true
 		}
 		if s.Currency == "" && currency != "" {
 			s.Currency = currency
-			log.Printf("Updating %v's currency", s)
+			log.Info("Updating %v's currency", s)
 			save = true
 		}
 	} else {
 		s.FailedFetches += 1
-		log.Printf("Could not fetch cotation %s for the %dth time.", s, s.FailedFetches)
+		log.Warning("Could not fetch cotation %s for the %dth time.", s, s.FailedFetches)
 		if s.FailedFetches > 1000 {
-			log.Printf("Deleting stock %#v ...", s)
+			log.Info("Deleting stock %#v ...", s)
 			db.DeleteStock(s)
 		} else {
 			save = true
@@ -325,10 +324,10 @@ func (s *Stock) GetValue() (value float32, currency string, err error) {
 	}
 
 	if s.Name == "" || s.Currency == "" { // We get the name if we couldn't get it earlier
-		log.Printf("Missing name or currency, trying to update data about %v", s)
+		log.Warning("Missing name or currency, trying to update data about %v", s)
 		if s2, err := tryNewStock(s.Market, s.Short); err == nil {
 			if s.Name == "" && s2.Name != "" {
-				log.Printf("Updating %v's name", s)
+				log.Info("Updating %v's name", s)
 				s.Name = s2.Name
 				save = true
 			}
@@ -336,7 +335,7 @@ func (s *Stock) GetValue() (value float32, currency string, err error) {
 	}
 
 	if save {
-		log.Printf("Updating stock %#v ...", s)
+		log.Info("Updating stock %#v ...", s)
 		db.SaveStock(s)
 	}
 
@@ -394,7 +393,7 @@ func (sm *StocksMgmt) LoadStocks() (err error) {
 	stocks := db.GetAllStocks()
 
 	for _, s := range *stocks {
-		log.Println("Loading", s.String(), "...")
+		log.Info("Loading %s...", s.String())
 		stock := s // Not doing so make us share the same pointer
 		sm.LoadStock(&stock)
 	}
@@ -427,5 +426,5 @@ func (sm *StocksMgmt) Start() {
 }
 
 func (sm *StocksMgmt) Stop() {
-	log.Println("StocksMgmt.Stop()")
+	log.Debug("StocksMgmt.Stop()")
 }
