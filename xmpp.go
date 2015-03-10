@@ -59,20 +59,33 @@ func (x *FtsXmpp) handle_chat(v *xmpp.Chat) (err error) {
 			x.Send <- &SendChat{Remote: v.Remote, Text: `
 Available commands are:
 
-help                              - This command
-s <stock> (+|-)<per> (<duration>) - Subscribe to variation about a stock (Ex: !s rno 2)
-u <stock>                         - Unsubscribe from a stock
-g <stock>                         - Get data about a stock
-ls                                - List currently monitored stocks
-v                                 - Get the value of our stocks
-v <stock>                         - Get the value of a particular stock
-v <stock> <nb> (<cost>)           - Register the number of shares and the cost of a particular stock
-pause <days>                      - Pause alerts for X days
-resume                            - Resume alerts
-uptime                            - Application uptime
-url                               - Show an URL with alerts
-nourl                             - Do not show an URL with alerts
-ping <data>                       - Ping test
+help - Show help
+
+s <stock> (+|-)<per> (<duration>) - Subscribe to variation about a stock (Ex: "s rno 2", "s rno -2 24h")
+
+u <stock> - Unsubscribe from a stock (Ex: "u rno")
+
+g <stock> - Get data about a stock (Ex: "g rno")
+
+ls - List currently monitored stocks
+
+v - Get the value of our stocks
+
+v <stock> - Get the value of a particular stock
+
+v <stock> <nb> (<cost>) - Register the number of shares and the cost of a particular stock
+
+pause <days> - Pause alerts for X days (Ex: "pause 30")
+
+resume - Resume alerts
+
+uptime - Application uptime
+
+url - Show an URL with alerts
+
+nourl - Do not show an URL with alerts
+
+ping <data> - Ping test
 `}
 		}
 	case "me":
@@ -389,7 +402,7 @@ ping <data>                       - Ping test
 		}
 	default:
 		{
-			if cmd == "WHAT? " {
+			if cmd == "what? " {
 				log.Printf("Potential loophole: %s", v.Text)
 				return nil
 			}
