@@ -78,10 +78,10 @@ Available commands are:
 			value, _, _ := stock.GetValue()
 			x.Send <- &SendChat{Remote: v.Remote, Text: fmt.Sprintf("Stock %s : %.3f %s", stock, value, stock.Currency)}
 		} else {
-			x.Send <- &SendChat{Remote: v.Remote, Text: fmt.Sprintf("Could not find stock %s: %v", short, err)}
+			x.Send <- &SendChat{Remote: v.Remote, Text: fmt.Sprintf("Could not find stock \"%s\".", short)}
 		}
 	} else if cmd == "!s" {
-		if len(tokens) != 3 {
+		if len(tokens) < 3 {
 			return errors.New("You must specify stock and percentage !")
 		}
 		short := tokens[1]
@@ -89,7 +89,7 @@ Available commands are:
 		stock, err := stocks.GetStock(short)
 
 		if err != nil {
-			return err
+			return errors.New(fmt.Sprintf("Could not find the stock \"%s\".", short))
 		}
 
 		contact := db.GetContactFromEmail(v.Remote)
@@ -124,12 +124,28 @@ Available commands are:
 			descDirection = "~"
 		}
 
-		alert, err := stocks.SubscribeAlert(stock, contact, float32(per), direction)
+		duration := int64(0)
+
+		if len(tokens) >= 4 { // For duration
+			if d, err := time.ParseDuration(tokens[3]); err == nil {
+				duration = int64(d)
+			} else {
+				return err
+			}
+		}
+
+		alert, err := stocks.SubscribeAlert(stock, contact, float32(per), direction, duration)
 		if err != nil {
 			return err
 		}
 
-		x.Send <- &SendChat{Remote: v.Remote, Text: fmt.Sprintf("Subscribed to %v with %s%.2f%% variation on alert %d.", stock, descDirection, per, alert.Id)}
+		message := fmt.Sprintf("Subscribed to %v with a %s%.2f%% variation", stock, descDirection, per)
+		if alert.Duration != 0 {
+			message += fmt.Sprintf(" on a %s time-window", time.Duration(alert.Duration))
+		}
+		message += fmt.Sprintf(" (alert %d).", alert.Id)
+
+		x.Send <- &SendChat{Remote: v.Remote, Text: message}
 
 	} else if cmd == "!u" {
 		if len(tokens) != 2 {

@@ -108,7 +108,7 @@ func (sf *StockFollower) considerValue(value float32) {
 				db.DeleteAlert(&al)
 				continue
 			}
-			if time.Now().UTC().UnixNano() < contact.PauseUntil {
+			if now < contact.PauseUntil {
 				log.Println("Alert", al.Id, "- Contact is in pause")
 				continue
 			}
@@ -118,6 +118,7 @@ func (sf *StockFollower) considerValue(value float32) {
 			timeDiff := time.Duration(now - al.LastTriggered)
 			timeDiff -= timeDiff % time.Second
 			al.LastTriggered = now
+			al.LastDate = now
 			message := fmt.Sprintf("%s : %.3f (%+.2f%%) in %v", sf.Stock.String(), value, per, timeDiff)
 
 			if contact.ShowUrl {
@@ -136,6 +137,19 @@ func (sf *StockFollower) considerValue(value float32) {
 			}
 
 			xm.Send <- &SendChat{Remote: contact.Email, Text: message}
+		} else {
+			// If we have a duration, we might have to push the LastDate in the future
+			if al.Duration != 0 && now-al.LastDate > al.Duration {
+				startOfTimeWindow := now - al.Duration
+				if value, err := db.GetStockValue(sf.Stock, startOfTimeWindow); err == nil {
+					al.LastDate = startOfTimeWindow
+					al.LastValue = value.Value
+					db.SaveAlert(&al)
+					log.Printf("Alert %d: lastDate = %v, lastValue = %v", al.Id, time.Unix(0, al.LastDate), al.LastValue)
+				} else {
+					log.Printf("Cannot find rows for alert %v: %v", sf.Stock, err)
+				}
+			}
 		}
 	}
 }
@@ -224,7 +238,7 @@ func tryNewStock(market, short string) (*Stock, error) {
 	return s, nil
 }
 
-var marketsToTest = [...]string{"FR", "AM", "US", "US2", "W"}
+var marketsToTest = [...]string{"FR", "AM", "US", "US2", "W", "BE"}
 
 func (s *Stock) boursoramaSymbol() (symbol string) {
 	switch s.Market {
@@ -238,6 +252,8 @@ func (s *Stock) boursoramaSymbol() (symbol string) {
 		symbol = "1rA" + s.Short
 	case "W": // Warrants
 		symbol = "2rP" + s.Short
+	case "BE": // EURONEXT Bruxelles
+		symbol = "FF11-" + s.Short
 	default:
 		log.Fatal("Unknown market: " + s.Market)
 	}
@@ -384,8 +400,8 @@ func (sm *StocksMgmt) LoadStocks() (err error) {
 	return nil
 }
 
-func (sm *StocksMgmt) SubscribeAlert(s *Stock, c *Contact, per float32, direction int) (alert *Alert, err error) {
-	a, e := db.SubscribeAlert(s, c, per, direction)
+func (sm *StocksMgmt) SubscribeAlert(s *Stock, c *Contact, per float32, direction int, duration int64) (alert *Alert, err error) {
+	a, e := db.SubscribeAlert(s, c, per, direction, duration)
 
 	sm.Lock()
 	if _, ok := sm.stocks[s.String()]; !ok {

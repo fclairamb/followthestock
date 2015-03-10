@@ -1,3 +1,14 @@
+followthestock (0.4) unstable; urgency=low
+
+  * Added support for plus/minus percentage change ("!s rno -1%")
+  * Added support for time-window alerts ("!s rno 1% 24h")
+  * Added belgium market
+  * Modified the database (automatic upgrade) to support new data
+  * Modified the database to add indexes
+  * Simplified some errors
+
+ -- Florent Clairambault <florent@xps>  Tue, 10 Mar 2015 00:35:53 +0100
+
 followthestock (0.3) unstable; urgency=low
 
   * Added URL support in the alerts (!url / !nourl)

@@ -62,6 +62,8 @@ type Alert struct {
 	Stock            int64   `db:"stock_id"`
 	LastTriggered    int64   `db:"last_triggered"`
 	LastValue        float32 `db:"last_value"`
+	LastDate         int64   `db:"last_date"`
+	Duration         int64   `db:"duration"`
 	Percent          float32 `db:"percent"`
 	PercentDirection int     `db:"percent_direction"`
 }
@@ -150,6 +152,10 @@ func (db *FtsDB) Upgrade() {
 			Version: 3,
 			Sql: []string{
 				`alter table ` + TABLE_ALERT + ` add column "percent_direction" integer default 0`,
+				`alter table ` + TABLE_ALERT + ` add column "last_date" integer default 0`,
+				`alter table ` + TABLE_ALERT + ` add column "duration" integer default 0`,
+				`create index value_stock_date on ` + TABLE_VALUE + `(stock_id, date);`,
+				`create index alert_stock on ` + TABLE_ALERT + `(stock_id);`,
 			},
 		},
 	}
@@ -273,14 +279,26 @@ func (db *FtsDB) SaveStockValue(stock *Stock, value float32, date int64) (err er
 	return err
 }
 
-func (db *FtsDB) SubscribeAlert(s *Stock, c *Contact, per float32, direction int) (alert *Alert, err error) {
+func (this *FtsDB) GetStockValue(stock *Stock, date int64) (*Value, error) {
+	value := &Value{}
+	err := db.mapping.SelectOne(value, "select * from "+TABLE_VALUE+" where stock_id=? and date>? order by date desc;", stock.Id, date)
+
+	if err != nil {
+		log.Printf("Issue requesting : select * from "+TABLE_VALUE+" where stock_id=%d and date>%d", stock.Id, date)
+		return nil, err
+	} else {
+		return value, nil
+	}
+}
+
+func (db *FtsDB) SubscribeAlert(s *Stock, c *Contact, per float32, direction int, duration int64) (alert *Alert, err error) {
 	_, err = db.UnsubscribeAlert(s, c)
 
 	if err != nil {
 		return nil, err
 	}
 
-	alert = &Alert{Stock: s.Id, Contact: c.Id, Percent: per, PercentDirection: direction}
+	alert = &Alert{Stock: s.Id, Contact: c.Id, Percent: per, PercentDirection: direction, Duration: duration}
 
 	err = db.SaveAlert(alert)
 
