@@ -3,9 +3,7 @@ package main
 import (
 	"bufio"
 	"fmt"
-	//"github.com/beevik/etree"
 	"os"
-
 	"strings"
 )
 

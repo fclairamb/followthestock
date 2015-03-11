@@ -1,3 +1,9 @@
+followthestock (0.4.1) unstable; urgency=low
+
+  * Negative condition alert fix
+
+ -- Florent Clairambault <florent@xps>  Wed, 11 Mar 2015 22:11:02 +0100
+
 followthestock (0.4-2) unstable; urgency=low
 
   * Updating log format

@@ -88,7 +88,7 @@ func (sf *StockFollower) considerValue(value float32) {
 		diff := value - al.LastValue
 		per := diff / al.LastValue * 100
 		varPer := float32(math.Abs(float64(per)))
-		log.Info("Alert %s", al.String())
+		log.Info("Alert %s / %f", al.String(), per)
 
 		var triggered bool
 		switch al.PercentDirection {
@@ -97,7 +97,7 @@ func (sf *StockFollower) considerValue(value float32) {
 		case ALERT_DIRECTION_UP:
 			triggered = (per > al.Percent)
 		case ALERT_DIRECTION_DOWN:
-			triggered = (per < al.Percent)
+			triggered = (per < -al.Percent)
 		}
 
 		if triggered {
