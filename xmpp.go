@@ -399,12 +399,13 @@ ping <data> - Ping test
 		{
 			x.Send <- &SendChat{Remote: v.Remote, Text: "version = " + FTS_VERSION}
 		}
+	case "what?":
+		{
+			log.Debug("Potential feedback loop: %s", v.Text)
+			return nil
+		}
 	default:
 		{
-			if cmd == "what? " {
-				log.Debug("Potential loophole: %s", v.Text)
-				return nil
-			}
 			x.Send <- &SendChat{Remote: v.Remote, Text: fmt.Sprintf("WHAT? Type \"help\". You issued \"%s\".", v.Text)}
 		}
 	}
