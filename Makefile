@@ -4,6 +4,9 @@ all: followthestock
 followthestock: *.go
 	go get -v ; go build -v -o followthestock
 
+test: followthestock
+	go test -v
+
 install:
 	# Config
 	mkdir -p $(DESTDIR)/etc/followthestock
@@ -36,7 +39,7 @@ test_package_local:
 	sudo dpkg -i dist/package/*.deb
 
 clean:
-	rm dist followthestock || printf ""
+	rm -Rf dist followthestock
 
 
 test_package_remote:
