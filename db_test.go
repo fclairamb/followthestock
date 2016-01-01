@@ -41,7 +41,9 @@ func TestStockDeletion(t *testing.T) {
 			Short:  "RNO",
 		}
 
-		db.SaveStock(s)
+		if err := db.SaveStock(s); err != nil {
+			t.Fatal("Problem", err)
+		}
 
 		c := &Contact{
 			Email: "florent@clairambault.fr",

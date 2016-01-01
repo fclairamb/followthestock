@@ -401,7 +401,7 @@ ping <data> - Ping test
 		}
 	case "what?":
 		{
-			log.Debug("Potential feedback loop: %s", v.Text)
+			log.Warning("Potential feedback loop: %s", v.Text)
 			return nil
 		}
 	default:
