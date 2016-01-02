@@ -464,7 +464,7 @@ func (x *FtsXmpp) runMain() {
 			}
 
 			if err != nil {
-				log.Error("Err:", err)
+				log.Error("Err: %s", err)
 				log.Debug("Sleeping %d seconds...", sleep/time.Second)
 				time.Sleep(sleep)
 				sleep += time.Second
