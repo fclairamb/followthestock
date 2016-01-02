@@ -45,6 +45,7 @@ Each client can send the following commands:
 * `!uptime` - Bot uptime
 
 Here are valid stock formats:
+
 * `RNO` is like `FR:RNO`, which is the french "RENAULT" stock
 * `US:RNO` is the "RHINO RESOURCE PARTNERS LP" stock
 * `FR0011574110` is like `W:FR0011574110` which is the "SOGEN 50C 0614S" warrant
