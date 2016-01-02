@@ -29,8 +29,9 @@ type Config struct {
 
 var Console bool
 
-func NewConfig() *Config {
-	config := &Config{}
+var config Config
+
+func init() {
 	config.Db.File = "followthestock.db"
 	config.Xmpp.Username = ""
 	config.Xmpp.Server = "talk.google.com:443"
@@ -49,13 +50,11 @@ func NewConfig() *Config {
 		os.Exit(2)
 	}
 	flag.Parse()
-	if err := gcfg.ReadFileInto(config, fileName); err != nil {
-		log.Fatalf("Could not read config: %v", err)
+	if err := gcfg.ReadFileInto(&config, fileName); err != nil {
+		fmt.Fprintln(os.Stderr, "Could not read config: ", fileName)
 	}
 
 	if showConfig {
-		log.Info("Config: %#v", config)
+		fmt.Printf("Config: %#v\n", config)
 	}
-
-	return config
 }

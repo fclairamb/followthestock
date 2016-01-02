@@ -11,8 +11,6 @@ var xm *FtsXmpp
 var db *FtsDB
 var stocks *StocksMgmt
 
-var config *Config
-
 var waitForRc chan int
 
 const FTS_VERSION = "0.4"
@@ -76,9 +74,6 @@ func core() (rc int) {
 func main() {
 
 	log.Info("Starting !")
-
-	// We parse the parameters
-	config = NewConfig()
 
 	rc := core()
 

@@ -4,15 +4,8 @@ import (
 	"testing"
 )
 
-func prepareConfig() {
-	if config == nil {
-		config = NewConfig()
-	}
-}
-
 // It's never too late to add unit tests
 func TestParameters(t *testing.T) {
-	prepareConfig()
 	db := NewFtsDB()
 	defer db.Close()
 
@@ -31,7 +24,6 @@ func TestParameters(t *testing.T) {
 }
 
 func TestStockDeletion(t *testing.T) {
-	prepareConfig()
 	db := NewFtsDB()
 	defer db.Close()
 

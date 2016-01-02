@@ -5,7 +5,7 @@ followthestock: *.go
 	go get -v ; go build -v -o followthestock
 
 test: followthestock
-	go test -v
+	go test ./... -config followthestock.conf
 
 install:
 	# Config
